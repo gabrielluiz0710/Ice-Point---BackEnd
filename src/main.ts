@@ -9,8 +9,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.enableCors({
-    // origin: 'http://localhost:5173',
-    origin: 'https://ice-point-front-end.vercel.app/',
+    origin: [
+    'http://localhost:5173',                  //  Local
+    'https://ice-point-front-end.vercel.app'  // Produção
+  ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
   });
