@@ -1,0 +1,20 @@
+{
+  // --- PARTE 1: RESOLVENDO O ERRO DE QUEBRA DE LINHA (CRLF) ---
+  // Força todos os arquivos a serem salvos com o final de linha do Linux (LF).
+  // Isso resolve DIRETAMENTE o erro "Delete `␍`".
+  "files.eol": "\n",
+
+  // --- PARTE 2: CONFIGURANDO A AUTOCORREÇÃO ---
+  // Define o Prettier como o formatador padrão para este projeto.
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  // Ação principal: Ao salvar, rode a autocorreção do ESLint.
+  // Isso vai corrigir os erros de Prettier e outros erros do ESLint.
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // Garante que a formatação ao salvar antiga esteja desativada
+  // para não conflitar com o "codeActionsOnSave".
+  "editor.formatOnSave": false
+}
