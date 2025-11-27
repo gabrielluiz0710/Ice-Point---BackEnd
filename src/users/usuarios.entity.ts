@@ -1,4 +1,5 @@
-import { Entity, PrimaryColumn, Column } from 'typeorm';
+import { Entity, PrimaryColumn, Column, OneToMany, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
+import { Enderecos } from '../enderecos/enderecos.entity';
 
 export interface UserProfile {
     id: string;
@@ -28,4 +29,10 @@ export class Usuarios implements UserProfile {
 
     @Column({ name: 'data_nascimento', type: 'date', nullable: true })
     data_nascimento: Date;
+
+    @Column({ nullable: true })
+    cpf: string;
+
+    @OneToMany(() => Enderecos, (endereco) => endereco.usuario, { cascade: true })
+    enderecos: Enderecos[];
 }

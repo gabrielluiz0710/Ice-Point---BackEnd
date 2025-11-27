@@ -1,19 +1,20 @@
-// src/app.module.ts (Adicione imports e o TypeOrmModule)
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm'; // Novo import
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module'; 
 import { UsersModule } from './users/users.module'; 
-import { Encomendas } from './encomendas/encomendas.entity'; // Novo import
-import { EncomendaItens } from './encomendas/encomenda-itens.entity'; // Novo import
-import { CartModule } from './cart/cart.module'; // Novo import
-import { Usuarios } from './users/usuarios.entity'; // 👈 Certifique-se de importar Usuarios!
+import { CartModule } from './cart/cart.module'; 
+import { EnderecosModule } from './enderecos/enderecos.module'; 
+import { Encomendas } from './encomendas/encomendas.entity'; 
+import { EncomendaItens } from './encomendas/encomenda-itens.entity';
+import { Usuarios } from './users/usuarios.entity';
+import { Enderecos } from './enderecos/enderecos.entity';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     
-    // 🚨 Configuração TypeORM 🚨
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -25,24 +26,23 @@ import { Usuarios } from './users/usuarios.entity'; // 👈 Certifique-se de imp
         database: configService.get<string>('DB_DATABASE'),
         entities: [
           Usuarios,
-            Encomendas, 
-            EncomendaItens,
-            // Adicione outras entidades aqui (Ex: Produtos, Usuarios, Enderecos)
+          Encomendas, 
+          EncomendaItens,
+          Enderecos,
         ],
-        // No Supabase, SSL/TLS é geralmente obrigatório
         ssl: {
           rejectUnauthorized: false, 
         },
-        synchronize: false, // Mantenha false em produção! O Supabase gerencia o schema.
+        synchronize: false,
       }),
       inject: [ConfigService],
     }),
-    // Fim da configuração TypeORM
     
     SupabaseModule, 
     AuthModule, 
     UsersModule, 
-    CartModule // Novo
+    CartModule,
+    EnderecosModule,
   ],
   controllers: [],
   providers: [],

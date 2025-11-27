@@ -1,4 +1,3 @@
-// src/main.ts (Seu backend NestJS)
 import * as dotenv from 'dotenv';
 dotenv.config();
 
