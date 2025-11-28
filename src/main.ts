@@ -11,8 +11,8 @@ async function bootstrap() {
     origin: [
     'http://localhost:5173',                  //  Local
     'https://ice-point-front-end.vercel.app',  // Produção
-    'https://www.icepoint.com.br/',
-    'https://icepoint.com.br/'
+    'https://www.icepoint.com.br',
+    'https://icepoint.com.br'
   ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
