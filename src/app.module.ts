@@ -4,12 +4,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module'; 
 import { UsersModule } from './users/users.module'; 
+import { ProductsModule } from './products/products.module';
+
 import { CartModule } from './cart/cart.module'; 
-import { EnderecosModule } from './enderecos/enderecos.module'; 
-import { Encomendas } from './encomendas/encomendas.entity'; 
-import { EncomendaItens } from './encomendas/encomenda-itens.entity';
-import { Usuarios } from './users/usuarios.entity';
-import { Enderecos } from './enderecos/enderecos.entity';
+import { EnderecosModule } from './enderecos/enderecos.module';
 
 @Module({
   imports: [
@@ -24,12 +22,7 @@ import { Enderecos } from './enderecos/enderecos.entity';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
-        entities: [
-          Usuarios,
-          Encomendas, 
-          EncomendaItens,
-          Enderecos,
-        ],
+        autoLoadEntities: true,
         ssl: {
           rejectUnauthorized: false, 
         },
@@ -43,6 +36,7 @@ import { Enderecos } from './enderecos/enderecos.entity';
     UsersModule, 
     CartModule,
     EnderecosModule,
+    ProductsModule
   ],
   controllers: [],
   providers: [],

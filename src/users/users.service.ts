@@ -44,37 +44,34 @@ export class UsersService {
     if (data.address) {
       const addrData = data.address;
 
-      const count = await this.enderecoRepository.count({
-        where: { usuarioId: userId },
-      });
-      const isPrincipal = count === 0 ? true : true;
-
-      if (isPrincipal) {
-        await this.enderecoRepository.update(
-          { usuarioId: userId },
-          { principal: false },
-        );
-      }
-
-      let existingAddr = await this.enderecoRepository.findOne({
+      let targetAddr = await this.enderecoRepository.findOne({
         where: { usuarioId: userId, principal: true },
       });
 
-      if (!existingAddr) {
-        existingAddr = new Enderecos();
-        existingAddr.usuarioId = userId;
+      if (!targetAddr) {
+         targetAddr = await this.enderecoRepository.findOne({ where: { usuarioId: userId } });
+         
+         if (!targetAddr) {
+             targetAddr = new Enderecos();
+             targetAddr.usuarioId = userId;
+         }
       }
 
-      existingAddr.logradouro = addrData.street;
-      existingAddr.numero = addrData.number;
-      existingAddr.complemento = addrData.complement;
-      existingAddr.bairro = addrData.neighborhood;
-      existingAddr.cidade = addrData.city;
-      existingAddr.estado = addrData.state;
-      existingAddr.cep = addrData.zip;
-      existingAddr.principal = true;
+      await this.enderecoRepository.update(
+        { usuarioId: userId },
+        { principal: false },
+      );
 
-      await this.enderecoRepository.save(existingAddr);
+      targetAddr.logradouro = addrData.street;
+      targetAddr.numero = addrData.number;
+      targetAddr.complemento = addrData.complement;
+      targetAddr.bairro = addrData.neighborhood;
+      targetAddr.cidade = addrData.city;
+      targetAddr.estado = addrData.state;
+      targetAddr.cep = addrData.zip;
+      targetAddr.principal = true;
+
+      await this.enderecoRepository.save(targetAddr);
     }
 
     return this.findProfileByUserId(userId);
