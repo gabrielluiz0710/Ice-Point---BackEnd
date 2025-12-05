@@ -38,7 +38,6 @@ import { EnderecosModule } from './enderecos/enderecos.module';
       }),
       inject: [ConfigService],
     }),
-    
     SupabaseModule, 
     AuthModule, 
     UsersModule, 
