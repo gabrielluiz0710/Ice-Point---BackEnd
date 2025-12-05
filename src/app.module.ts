@@ -31,7 +31,7 @@ import { EnderecosModule } from './enderecos/enderecos.module';
 
         extra: {
           max: 20, 
-          connectionTimeoutMillis: 10000, 
+          connectionTimeoutMillis: 40000, 
           idleTimeoutMillis: 30000, 
           keepAlive: true, 
         },
