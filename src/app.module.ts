@@ -23,10 +23,18 @@ import { EnderecosModule } from './enderecos/enderecos.module';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
         autoLoadEntities: true,
+        synchronize: false, 
+
         ssl: {
           rejectUnauthorized: false, 
         },
-        synchronize: false,
+
+        extra: {
+          max: 20, 
+          connectionTimeoutMillis: 10000, 
+          idleTimeoutMillis: 30000, 
+          keepAlive: true, 
+        },
       }),
       inject: [ConfigService],
     }),
