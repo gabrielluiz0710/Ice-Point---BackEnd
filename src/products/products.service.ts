@@ -37,54 +37,90 @@ export class ProductsService {
   }
 
   async create(createProductDto: CreateProductDto, files: Array<Express.Multer.File>) {
-    let categoryId = createProductDto.categoriaId;
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // 1. Lógica de Criação de Categoria Automática
-    if (createProductDto.novaCategoria) {
-      const existing = await this.categoryRepo.createQueryBuilder('cat')
-        .where('LOWER(cat.nome) = LOWER(:nome)', { nome: createProductDto.novaCategoria })
-        .getOne();
+    try {
+      let categoryId = createProductDto.categoriaId;
 
-      if (existing) {
-        categoryId = existing.id;
-      } else {
-        const newCat = this.categoryRepo.create({ nome: createProductDto.novaCategoria });
-        const savedCat = await this.categoryRepo.save(newCat);
-        categoryId = savedCat.id;
+      let categoryToSave: Category | null = null;
+      if (createProductDto.novaCategoria) {
+        const existing = await this.categoryRepo.findOne({ where: { nome: createProductDto.novaCategoria } });
+        if (existing) {
+          categoryToSave = existing;
+        } else {
+          const newCat = this.categoryRepo.create({ nome: createProductDto.novaCategoria });
+          categoryToSave = await queryRunner.manager.save(newCat);
+        }
+      } else if (categoryId) {
       }
+
+      const isDisponivel = String(createProductDto.disponivel) === 'true';
+      const preco = Number(createProductDto.preco_unitario);
+      
+      const newProduct = this.productRepo.create({
+        ...createProductDto,
+        preco_unitario: preco,
+        disponivel: isDisponivel,
+        categoria: categoryToSave ? categoryToSave : (categoryId ? { id: Number(categoryId) } as Category : undefined),
+        informacaoNutricional: typeof createProductDto.informacaoNutricional === 'string' 
+          ? JSON.parse(createProductDto.informacaoNutricional) 
+          : createProductDto.informacaoNutricional
+      });
+
+      delete (newProduct as any).categoriaId;
+      delete (newProduct as any).novaCategoria;
+
+      const savedProduct = await queryRunner.manager.save(newProduct);
+
+      let capaUrl: string | null = null;
+
+      if (files && files.length > 0) {
+        for (const [index, file] of files.entries()) {
+          const webpBuffer = await sharp(file.buffer)
+            .resize({ width: 1000, withoutEnlargement: true })
+            .webp({ quality: 80 })
+            .toBuffer();
+
+          const fileName = `produtos/${savedProduct.id}/${uuidv4()}.webp`;
+
+          const { error } = await this.supabase.storage
+            .from('images')
+            .upload(fileName, webpBuffer, { contentType: 'image/webp', upsert: true });
+
+          if (error) throw new InternalServerErrorException('Erro no upload da imagem');
+
+          const { data: { publicUrl } } = this.supabase.storage.from('images').getPublicUrl(fileName);
+
+          if (index === 0) {
+            capaUrl = publicUrl;
+          }
+
+          const newImage = this.imageRepo.create({
+            produtoId: savedProduct.id, 
+            url: publicUrl,
+            caminhoStorage: fileName,
+            ordem: index
+          });
+          await queryRunner.manager.save(newImage);
+        }
+      }
+
+      if (capaUrl) {
+        await queryRunner.manager.update(Product, savedProduct.id, { imagemCapa: capaUrl });
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(savedProduct.id);
+
+    } catch (err) {
+      await queryRunner.rollbackTransaction();
+      console.error('Erro ao criar produto:', err);
+      throw err;
+    } finally {
+      await queryRunner.release();
     }
-
-    // 2. Conversão e Tratamento de Tipos
-    const isDisponivel = String(createProductDto.disponivel) === 'true';
-    const preco = Number(createProductDto.preco_unitario);
-    
-    // CORREÇÃO DO ERRO AQUI:
-    // O TypeORM prefere 'undefined' ao invés de 'null' na criação para campos opcionais
-    const categoriaRelation = categoryId ? { id: Number(categoryId) } : undefined;
-
-    const newProduct = this.productRepo.create({
-      ...createProductDto,
-      preco_unitario: preco,
-      disponivel: isDisponivel,
-      categoria: categoriaRelation, // Aqui usamos a variável corrigida
-      informacaoNutricional: typeof createProductDto.informacaoNutricional === 'string' 
-        ? JSON.parse(createProductDto.informacaoNutricional) 
-        : createProductDto.informacaoNutricional
-    });
-
-    // Limpeza de propriedades que não existem na entidade Product
-    // Isso evita erros se o DTO tiver campos a mais que o banco não aceita
-    delete (newProduct as any).categoriaId;
-    delete (newProduct as any).novaCategoria;
-
-    const savedProduct = await this.productRepo.save(newProduct);
-
-    // 3. Upload de Imagens
-    if (files && files.length > 0) {
-      await this.processAndUploadImages(savedProduct, files);
-    }
-
-    return this.findOne(savedProduct.id);
   }
 
   async update(id: number, updateProductDto: UpdateProductDto, files: Array<Express.Multer.File>) {
@@ -93,16 +129,13 @@ export class ProductsService {
     await queryRunner.startTransaction();
 
     try {
-      // 1. Validar existência (Leitura fora da transação ou dentro, tanto faz)
       const product = await this.productRepo.findOne({ where: { id }, relations: ['categoria'] });
       if (!product) throw new BadRequestException('Produto não encontrado');
 
       const { informacaoNutricional, categoriaId, novaCategoria, disponivel, imagensParaRemover, ...rest } = updateProductDto;
 
-      // 2. Resolver Categoria
       let categoryToSave: Category | null = null;
       if (novaCategoria) {
-        // Verifica se existe para não duplicar
         const existingCat = await this.categoryRepo.findOne({ where: { nome: novaCategoria }});
         if (existingCat) {
           categoryToSave = existingCat;
@@ -114,8 +147,6 @@ export class ProductsService {
         categoryToSave = await this.categoryRepo.findOne({ where: { id: Number(categoriaId) } });
       }
 
-      // 3. Preparar Objeto de Update (Apenas campos TEXTO/BOOLEAN)
-      // Nota: Não passamos 'imagens' aqui para não confundir o TypeORM
       const updateData: any = { ...rest };
       
       if (disponivel !== undefined) updateData.disponivel = String(disponivel) === 'true';
@@ -126,21 +157,15 @@ export class ProductsService {
           : informacaoNutricional;
       }
 
-      // Atualiza dados básicos do produto usando QueryRunner
       await queryRunner.manager.update(Product, id, updateData);
 
-      // 4. DELETAR IMAGENS
       if (imagensParaRemover) {
         const idsParsed = JSON.parse(imagensParaRemover);
         if (Array.isArray(idsParsed) && idsParsed.length > 0) {
-          // Buscar caminhos para deletar do Storage depois
           const imagesToDelete = await this.imageRepo.findByIds(idsParsed);
           
-          // Deletar do Banco (Dentro da Transação)
           await queryRunner.manager.delete(ProductImage, idsParsed);
 
-          // Deletar do Storage (Assíncrono - se falhar, não aborta a transação do banco, apenas loga)
-          // Fazemos isso aqui ou no 'finally', mas aqui já garantimos que o banco aceitou a deleção
           const paths = imagesToDelete.map(img => img.caminhoStorage).filter(p => p);
           if (paths.length > 0) {
              await this.supabase.storage.from('images').remove(paths);
@@ -148,7 +173,6 @@ export class ProductsService {
         }
       }
 
-      // 5. UPLOAD NOVAS IMAGENS
       if (files && files.length > 0) {
         for (const [index, file] of files.entries()) {
           const webpBuffer = await sharp(file.buffer)
@@ -158,7 +182,6 @@ export class ProductsService {
 
           const fileName = `produtos/${id}/${uuidv4()}.webp`;
 
-          // Upload Storage
           const { error } = await this.supabase.storage
             .from('images')
             .upload(fileName, webpBuffer, { contentType: 'image/webp', upsert: true });
@@ -167,19 +190,16 @@ export class ProductsService {
 
           const { data: { publicUrl } } = this.supabase.storage.from('images').getPublicUrl(fileName);
 
-          // Salvar referência no Banco (Dentro da Transação)
           const newImage = this.imageRepo.create({
-            produtoId: id, // Link direto pelo ID para evitar carregar o objeto Product inteiro
+            produtoId: id, 
             url: publicUrl,
             caminhoStorage: fileName,
-            ordem: 99 // Ordem provisória, pode ajustar depois
+            ordem: 99 
           });
           await queryRunner.manager.save(newImage);
         }
       }
 
-      // 6. LÓGICA DA CAPA (Recalcular com base no estado final do banco)
-      // Buscamos todas as imagens que restaram/entraram para esse produto
       const currentImages = await queryRunner.manager.find(ProductImage, {
         where: { produtoId: id },
         order: { id: 'ASC' }
@@ -187,23 +207,13 @@ export class ProductsService {
 
       let novaCapa: string | null = null;
       if (currentImages.length > 0) {
-        // Verifica se a capa atual (que estava no produto) ainda existe na lista
-        // Como não carregamos o produto atualizado na memória, vamos assumir:
-        // Se tem imagens, a primeira (mais antiga ou definida por ordem) é a capa.
-        // Ou mantemos a lógica: se a capa antiga foi deletada, pega a primeira.
-        
-        // Simples e eficaz: A primeira imagem da lista vira a capa, garantindo que sempre tem capa.
-        // Se quiser manter a capa antiga se ela não foi deletada, teria que comparar.
-        // Vamos forçar a primeira da lista ser a capa para evitar "capa quebrada".
         novaCapa = currentImages[0].url;
       }
 
       await queryRunner.manager.update(Product, id, { imagemCapa: novaCapa });
 
-      // COMMIT FINAL
       await queryRunner.commitTransaction();
 
-      // Retorna o produto fresco
       return this.findOne(id);
 
     } catch (err) {
@@ -267,10 +277,9 @@ export class ProductsService {
         produto: product,
         url: publicUrl,
         caminhoStorage: fileName,
-        ordem: index // Você pode melhorar a lógica de ordem se quiser somar ao length existente
+        ordem: index 
       });
 
-      // Salvamos a imagem individualmente
       const savedImg = await this.imageRepo.save(newImage);
       uploadedImages.push(savedImg);
     }
