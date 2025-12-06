@@ -25,9 +25,7 @@ import { EnderecosModule } from './enderecos/enderecos.module';
         autoLoadEntities: true,
         synchronize: false, 
 
-        ssl: {
-          rejectUnauthorized: false, 
-        },
+        ssl: false,
 
         extra: {
           max: 20, 
