@@ -22,6 +22,9 @@ export class Product {
   @Column({ default: true })
   disponivel: boolean;
 
+  @Column({ default: false })
+  destaque: boolean;
+
   @Column({ type: 'text', nullable: true })
   ingredientes: string;
 

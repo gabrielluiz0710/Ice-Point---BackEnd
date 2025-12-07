@@ -91,7 +91,6 @@ export class UsersController {
       origin = origin.slice(0, -1);
     }
 
-    // Passamos a origem para o service
     return this.usersService.createAdminUser(body, origin);
   }
 

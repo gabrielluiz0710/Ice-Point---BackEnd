@@ -36,6 +36,37 @@ export class ProductsService {
     });
   }
 
+  async findHighlights() {
+    return this.productRepo.find({
+      where: { 
+        destaque: true,
+        disponivel: true
+      },
+      select: {
+        id: true,
+        nome: true,
+        descricao: true,
+        preco_unitario: true,
+        imagemCapa: true,
+        destaque: true
+      },
+      order: { id: 'DESC' }
+    });
+  }
+
+  async toggleHighlight(id: number, destaque: boolean) {
+    const product = await this.productRepo.findOne({ where: { id } });
+    if (!product) throw new BadRequestException('Produto não encontrado');
+
+    await this.productRepo.update(id, { destaque });
+
+    return { 
+      message: `Produto "${product.nome}" agora ${destaque ? 'é destaque' : 'não é mais destaque'}`,
+      id: product.id,
+      destaque: destaque
+    };
+  }
+
   async create(createProductDto: CreateProductDto, files: Array<Express.Multer.File>) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -224,6 +255,18 @@ export class ProductsService {
       await queryRunner.release();
     }
   }
+
+async updatePriceByCategory(categoryId: number, newPrice: number) {
+  const category = await this.categoryRepo.findOne({ where: { id: categoryId } });
+  if (!category) throw new BadRequestException('Categoria não encontrada');
+
+  await this.productRepo.update(
+    { categoria: { id: categoryId } },
+    { preco_unitario: newPrice }
+  );
+
+  return { message: `Preços da categoria ${category.nome} atualizados para R$ ${newPrice}` };
+}
 
   async remove(id: number) {
     const product = await this.findOne(id);

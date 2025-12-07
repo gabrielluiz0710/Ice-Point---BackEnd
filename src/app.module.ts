@@ -8,6 +8,7 @@ import { ProductsModule } from './products/products.module';
 
 import { CartModule } from './cart/cart.module'; 
 import { EnderecosModule } from './enderecos/enderecos.module';
+import { GoogleReviewsModule } from './google-reviews/google-reviews.module';
 
 @Module({
   imports: [
@@ -41,7 +42,8 @@ import { EnderecosModule } from './enderecos/enderecos.module';
     UsersModule, 
     CartModule,
     EnderecosModule,
-    ProductsModule
+    ProductsModule,
+    GoogleReviewsModule
   ],
   controllers: [],
   providers: [],
