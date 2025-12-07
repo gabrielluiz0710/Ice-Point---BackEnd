@@ -52,4 +52,11 @@ export class EnderecosService {
     private async desmarcarPrincipal(userId: string) {
         await this.enderecoRepository.update({ usuarioId: userId }, { principal: false });
     }
+
+    async findAllByUserId(userId: string): Promise<Enderecos[]> {
+    return this.enderecoRepository.find({
+        where: { usuarioId: userId },
+        order: { principal: 'DESC', id: 'ASC' }
+    });
+}
 }
