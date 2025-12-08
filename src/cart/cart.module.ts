@@ -5,11 +5,12 @@ import { CartController } from './cart.controller';
 import { CartService } from './cart.service';
 import { Encomendas } from '../encomendas/encomendas.entity';
 import { EncomendaItens } from '../encomendas/encomenda-itens.entity';
+import { Product } from '../products/entities/product.entity'; 
 
 @Module({
   imports: [
     // Importa as entidades relacionadas ao carrinho para o módulo
-    TypeOrmModule.forFeature([Encomendas, EncomendaItens]),
+    TypeOrmModule.forFeature([Encomendas, EncomendaItens, Product]),
   ],
   controllers: [CartController],
   providers: [CartService],
