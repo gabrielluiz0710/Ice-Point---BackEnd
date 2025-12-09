@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm'; 
+import { Repository, Not, In, LessThanOrEqual, MoreThanOrEqual } from 'typeorm'; 
 import { CartItemDto } from './dto/cart-transfer.dto';
 import { Encomendas } from '../encomendas/encomendas.entity';
 import { EncomendaItens } from '../encomendas/encomenda-itens.entity';
-// Importe a entidade Produtos para pegar o preço real
 import { Product } from '../products/entities/product.entity'; 
+import { Carrinho } from '../carrinhos/carrinho.entity';
 
 @Injectable()
 export class CartService {
@@ -14,11 +14,12 @@ export class CartService {
     private readonly encomendaRepository: Repository<Encomendas>,
     @InjectRepository(EncomendaItens)
     private readonly itemRepository: Repository<EncomendaItens>,
-    @InjectRepository(Product) // Injete o repositório de produtos
+    @InjectRepository(Product)
     private readonly produtoRepository: Repository<Product>,
+    @InjectRepository(Carrinho) 
+    private readonly carrinhoRepository: Repository<Carrinho>,
   ) {}
 
-  // Busca carrinho existente
   async getActiveCart(userId: string) {
     return this.encomendaRepository.findOne({
       where: { cliente_id: userId, status: 'PENDENTE' as any },
@@ -26,15 +27,11 @@ export class CartService {
     });
   }
 
-  // Lógica de Transferência (Mantida, mas simplificada para usar o sync)
   async transferAnonCart(userId: string, anonItems: CartItemDto[]) {
-    // Apenas chama o sync, pois a lógica é a mesma: o que vem do front prevalece ou soma
     return this.syncCart(userId, anonItems);
   }
 
-  // Lógica Principal: Salvar Carrinho
   async syncCart(userId: string, items: CartItemDto[]) {
-    // 1. Busca ou cria a encomenda PENDENTE
     let activeCart = await this.encomendaRepository.findOne({
       where: { cliente_id: userId, status: 'PENDENTE' as any },
       relations: ['itens'], 
@@ -50,15 +47,10 @@ export class CartService {
       activeCart = await this.encomendaRepository.save(activeCart);
     }
 
-    // 2. Limpa itens zerados que podem ter vindo (segurança)
     const validItems = items.filter(i => i.quantity > 0);
 
-    // 3. Processa os itens
     let novoValorTotal = 0;
 
-    // Removemos todos os itens antigos para recriar com base no estado atual do Front
-    // (Estratégia mais segura para evitar desync). 
-    // Se quiser performance extrema em escala gigantesca, faria diff, mas para e-commerce normal, delete/insert é ok.
     if (activeCart.itens && activeCart.itens.length > 0) {
         await this.itemRepository.delete({ encomenda_id: activeCart.id });
     }
@@ -66,7 +58,6 @@ export class CartService {
     const itensParaSalvar: EncomendaItens[] = [];
 
     for (const itemDto of validItems) {
-        // Busca preço atual do produto no banco
         const produto = await this.produtoRepository.findOne({ where: { id: itemDto.productId } });
         const preco = produto ? Number(produto.preco_unitario) : 0;
 
@@ -74,21 +65,57 @@ export class CartService {
             encomenda_id: activeCart.id,
             produto_id: itemDto.productId,
             quantidade: itemDto.quantity,
-            preco_unitario_congelado: preco // Salva o preço do momento
+            preco_unitario_congelado: preco 
         });
 
         itensParaSalvar.push(novoItem);
         novoValorTotal += preco * itemDto.quantity;
     }
 
-    // Salva tudo
     if (itensParaSalvar.length > 0) {
         await this.itemRepository.save(itensParaSalvar);
     }
 
-    // Atualiza valor total da encomenda
     await this.encomendaRepository.update(activeCart.id, { valor_total: novoValorTotal });
 
     return { success: true, cartId: activeCart.id };
+  }
+
+  async checkAvailability(dateString: string) {
+    const targetDate = new Date(dateString);
+    
+    const windowStart = new Date(targetDate.getTime() - (24 * 60 * 60 * 1000));
+    const windowEnd = new Date(targetDate.getTime() + (24 * 60 * 60 * 1000));
+
+    
+    const busyCartsBuilder = this.encomendaRepository.createQueryBuilder('encomenda')
+      .select('carrinho.id')
+      .innerJoin('encomenda.carrinhos', 'carrinho') 
+      .where('encomenda.status != :status', { status: 'CANCELADO' })
+      .andWhere('encomenda.data_entrega >= :start', { start: windowStart })
+      .andWhere('encomenda.data_entrega <= :end', { end: windowEnd });
+
+    const availableCarts = await this.carrinhoRepository.createQueryBuilder('c')
+      .where(`c.id NOT IN (${busyCartsBuilder.getQuery()})`)
+      .setParameters(busyCartsBuilder.getParameters()) 
+      .andWhere('c.status = :statusCarrinho', { statusCarrinho: 'DISPONIVEL' }) 
+      .getMany();
+
+    const summary = {
+      totalAvailable: availableCarts.length,
+      details: availableCarts.map(c => ({
+        id: c.id,
+        identificacao: c.identificacao,
+        cor: c.cor,
+        capacidade: c.capacidade
+      })),
+      byColor: availableCarts.reduce((acc, curr) => {
+        const cor = curr.cor || 'Sem Cor';
+        acc[cor] = (acc[cor] || 0) + 1;
+        return acc;
+      }, {})
+    };
+
+    return summary;
   }
 }

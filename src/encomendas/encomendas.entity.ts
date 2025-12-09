@@ -1,22 +1,20 @@
-// src/encomendas/encomendas.entity.ts
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToMany, JoinTable } from 'typeorm';
 import { EncomendaItens } from './encomenda-itens.entity';
-// Importe a entidade Usuarios quando ela for criada
-// import { Usuarios } from '../usuarios/usuarios.entity';
+import { Carrinho } from '../carrinhos/carrinho.entity';
 
-@Entity('encomendas') // Nome da tabela no seu DB: ENCOMENDAS
+@Entity('encomendas') 
 export class Encomendas {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column({ type: 'uuid', name: 'cliente_id' })
-  cliente_id: string; // UUID do Supabase Auth
-
-  @Column({ nullable: true, name: 'carrinho_id' })
-  carrinho_id: number;
+  cliente_id: string;
 
   @Column({ type: 'timestamp with time zone', default: () => 'now()', name: 'data_solicitacao' })
   data_solicitacao: Date;
+
+  @Column({ type: 'timestamp with time zone', nullable: true, name: 'data_entrega' })
+  data_entrega: Date;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0.00, name: 'valor_total' })
   valor_total: number;
@@ -26,4 +24,12 @@ export class Encomendas {
 
   @OneToMany(() => EncomendaItens, item => item.encomenda, { cascade: true })
   itens: EncomendaItens[];
+
+  @ManyToMany(() => Carrinho)
+  @JoinTable({
+    name: 'encomendas_carrinhos',
+    joinColumn: { name: 'encomenda_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'carrinho_id', referencedColumnName: 'id' },
+  })
+  carrinhos: Carrinho[];
 }

@@ -1,4 +1,3 @@
-// src/cart/dto/cart-transfer.dto.ts
 import { IsInt, IsNotEmpty, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 

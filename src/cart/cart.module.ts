@@ -1,4 +1,3 @@
-// src/cart/cart.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CartController } from './cart.controller';
@@ -6,11 +5,11 @@ import { CartService } from './cart.service';
 import { Encomendas } from '../encomendas/encomendas.entity';
 import { EncomendaItens } from '../encomendas/encomenda-itens.entity';
 import { Product } from '../products/entities/product.entity'; 
+import { Carrinho } from '../carrinhos/carrinho.entity';
 
 @Module({
   imports: [
-    // Importa as entidades relacionadas ao carrinho para o módulo
-    TypeOrmModule.forFeature([Encomendas, EncomendaItens, Product]),
+    TypeOrmModule.forFeature([Encomendas, EncomendaItens, Product, Carrinho]),
   ],
   controllers: [CartController],
   providers: [CartService],

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, UseGuards, Request, Query, BadRequestException } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { CartTransferDto } from './dto/cart-transfer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; 
@@ -7,7 +7,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
-  // Já existente (Mantém)
   @UseGuards(JwtAuthGuard)
   @Post('transfer')
   async transferAnonCart(@Request() req, @Body() cartTransferDto: CartTransferDto) {
@@ -15,7 +14,6 @@ export class CartController {
     return await this.cartService.transferAnonCart(userId, cartTransferDto.items);
   }
 
-  // NOVO: Busca o carrinho pendente ao carregar a página
   @UseGuards(JwtAuthGuard)
   @Get()
   async getActiveCart(@Request() req) {
@@ -23,11 +21,19 @@ export class CartController {
     return await this.cartService.getActiveCart(userId);
   }
 
-  // NOVO: Sincroniza o carrinho (Chamado quando o usuário clica em + ou -)
   @UseGuards(JwtAuthGuard)
   @Put('sync')
   async syncCart(@Request() req, @Body() cartTransferDto: CartTransferDto) {
     const userId = req.user.userId;
     return await this.cartService.syncCart(userId, cartTransferDto.items);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('availability')
+  async checkAvailability(@Query('date') dateString: string) {
+    if (!dateString) {
+      throw new BadRequestException('Data é obrigatória');
+    }
+    return await this.cartService.checkAvailability(dateString);
   }
 }
