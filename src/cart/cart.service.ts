@@ -160,6 +160,26 @@ export class CartService {
     return summary;
   }
 
+  private toIsoDate(value: string | Date | undefined): string | null {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+      return value.toISOString().split('T')[0];
+    }
+
+    const stringValue = String(value).trim();
+
+    if (stringValue.includes('/')) {
+      const parts = stringValue.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        return `${year}-${month}-${day}`;
+      }
+    }
+
+    return stringValue;
+  }
+
   async finalizeOrder(userId: string | null, dto: CheckoutDto) {
     return await this.dataSource.transaction(async (manager) => {
       let usuario: Usuarios | null = null;
@@ -196,12 +216,12 @@ export class CartService {
       finalCart.cpfCliente = personalData.cpf || usuario?.cpf || '';
 
       if (personalData.birthDate) {
-        finalCart.dataNascimentoCliente = personalData.birthDate;
+        finalCart.dataNascimentoCliente = this.toIsoDate(personalData.birthDate);
       } else if (usuario?.data_nascimento) {
-        finalCart.dataNascimentoCliente = usuario.data_nascimento.toString();
+        finalCart.dataNascimentoCliente = this.toIsoDate(usuario.data_nascimento);
       }
 
-      finalCart.dataAgendada = dto.dataAgendada;
+      finalCart.dataAgendada = this.toIsoDate(dto.dataAgendada) as string;
       finalCart.horaAgendada = dto.horaAgendada;
       finalCart.metodoEntrega = dto.metodoEntrega;
       finalCart.metodoPagamento = dto.metodoPagamento;
