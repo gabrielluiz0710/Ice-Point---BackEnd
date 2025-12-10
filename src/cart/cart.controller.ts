@@ -1,7 +1,18 @@
-import { Controller, Post, Get, Put, Body, UseGuards, Request, Query, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Put,
+  Body,
+  UseGuards,
+  Request,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import { CartService } from './cart.service';
 import { CartTransferDto } from './dto/cart-transfer.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; 
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CheckoutDto } from './dto/checkout.dto';
 
 @Controller('cart')
 export class CartController {
@@ -9,9 +20,15 @@ export class CartController {
 
   @UseGuards(JwtAuthGuard)
   @Post('transfer')
-  async transferAnonCart(@Request() req, @Body() cartTransferDto: CartTransferDto) {
-    const userId: string = req.user.userId; 
-    return await this.cartService.transferAnonCart(userId, cartTransferDto.items);
+  async transferAnonCart(
+    @Request() req,
+    @Body() cartTransferDto: CartTransferDto,
+  ) {
+    const userId: string = req.user.userId;
+    return await this.cartService.transferAnonCart(
+      userId,
+      cartTransferDto.items,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -28,12 +45,19 @@ export class CartController {
     return await this.cartService.syncCart(userId, cartTransferDto.items);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('availability')
   async checkAvailability(@Query('date') dateString: string) {
     if (!dateString) {
       throw new BadRequestException('Data é obrigatória');
     }
     return await this.cartService.checkAvailability(dateString);
+  }
+
+  @Post('checkout')
+  async finalizeOrder(@Body() checkoutDto: CheckoutDto) {
+    return await this.cartService.finalizeOrder(
+      checkoutDto.userId,
+      checkoutDto,
+    );
   }
 }

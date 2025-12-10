@@ -1,31 +1,29 @@
-// src/encomendas/encomenda-itens.entity.ts
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { Encomendas } from './encomendas.entity';
-// import { Produtos } from '../produtos/produtos.entity'; // Entidade Produtos futura
+import { Product } from '../products/entities/product.entity';
 
-@Entity('encomenda_itens') // Nome da tabela no seu DB: ENCOMENDA_ITENS
+@Entity('encomenda_itens')
 export class EncomendaItens {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column({ name: 'encomenda_id' })
-  encomenda_id: number;
+  encomendaId: number;
 
   @Column({ name: 'produto_id' })
-  produto_id: number;
+  produtoId: number;
 
   @Column()
   quantidade: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, name: 'preco_unitario_congelado' })
-  preco_unitario_congelado: number;
+  @Column({ type: 'numeric', precision: 10, scale: 2, name: 'preco_unitario_congelado' })
+  precoUnitarioCongelado: number;
 
-  @ManyToOne(() => Encomendas, encomenda => encomenda.itens)
+  @ManyToOne(() => Encomendas, encomenda => encomenda.itens, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'encomenda_id' })
   encomenda: Encomendas;
   
-  // Relação ManyToOne com Produtos (futuro)
-  // @ManyToOne(() => Produtos)
-  // @JoinColumn({ name: 'produto_id' })
-  // produto: Produtos;
+  @ManyToOne(() => Product)
+  @JoinColumn({ name: 'produto_id' })
+  produto: Product;
 }

@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, JoinColumn, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+  CreateDateColumn,
+} from 'typeorm';
 import { Category } from './category.entity';
 import { ProductImage } from './product-image.entity';
 
@@ -16,7 +24,7 @@ export class Product {
   @Column({ type: 'text', nullable: true })
   descricao: string;
 
-  @Column({ type: 'numeric', precision: 10, scale: 2 })
+  @Column({ type: 'numeric', precision: 10, scale: 2, name: 'preco_unitario' })
   preco_unitario: number;
 
   @Column({ default: true })
@@ -36,11 +44,13 @@ export class Product {
 
   @Column({ name: 'imagem_capa', type: 'text', nullable: true })
   imagemCapa: string | null;
-  
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @ManyToOne(() => Category, (category) => category.produtos, { onDelete: 'SET NULL' })
+  @ManyToOne(() => Category, (category) => category.produtos, {
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'categoria_id' })
   categoria: Category;
 

@@ -1,0 +1,22 @@
+export enum EncomendaStatus {
+  PENDENTE = 'PENDENTE',
+  AGUARDANDO_PAGAMENTO = 'AGUARDANDO_PAGAMENTO',
+  PAGO = 'PAGO',
+  CONFIRMADO = 'CONFIRMADO',
+  EM_PREPARACAO = 'EM_PREPARACAO',
+  SAIU_PARA_ENTREGA = 'SAIU_PARA_ENTREGA',
+  ENTREGUE = 'ENTREGUE',
+  CANCELADO = 'CANCELADO',
+}
+
+export enum MetodoEntrega {
+  DELIVERY = 'DELIVERY',
+  PICKUP = 'PICKUP',
+}
+
+export enum MetodoPagamento {
+  PIX = 'PIX',
+  CASH = 'CASH',
+  CARD = 'CARD',
+  ONLINE = 'ONLINE',
+}

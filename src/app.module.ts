@@ -5,10 +5,11 @@ import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module'; 
 import { UsersModule } from './users/users.module'; 
 import { ProductsModule } from './products/products.module';
-
 import { CartModule } from './cart/cart.module'; 
 import { EnderecosModule } from './enderecos/enderecos.module';
 import { GoogleReviewsModule } from './google-reviews/google-reviews.module';
+import { PaymentModule } from './payment/payment.module';
+import { EncomendasModule } from './encomendas/encomendas.module';
 
 @Module({
   imports: [
@@ -43,7 +44,9 @@ import { GoogleReviewsModule } from './google-reviews/google-reviews.module';
     CartModule,
     EnderecosModule,
     ProductsModule,
-    GoogleReviewsModule
+    GoogleReviewsModule,
+    PaymentModule,
+    EncomendasModule
   ],
   controllers: [],
   providers: [],
