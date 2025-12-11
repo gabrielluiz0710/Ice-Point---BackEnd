@@ -10,6 +10,7 @@ import { Encomendas } from './encomendas.entity';
 import { Usuarios } from '../users/usuarios.entity';
 import { EncomendaStatus } from './encomenda.enums';
 import { MailService } from '../mail/mail.service';
+import { CalendarService } from '../calendar/calendar.service';
 
 export interface PedidoResumido {
   id: number;
@@ -28,6 +29,7 @@ export class EncomendasService {
     @InjectRepository(Usuarios)
     private readonly usuarioRepository: Repository<Usuarios>,
     private readonly mailService: MailService,
+    private readonly calendarService: CalendarService,
   ) {}
 
   async findAllByUserEmail(userId: string) {
@@ -142,6 +144,10 @@ export class EncomendasService {
     order.motivoCancelamento = motivo;
 
     const savedOrder = await this.encomendaRepository.save(order);
+
+    if (savedOrder.googleEventId) {
+      this.calendarService.deleteOrderEvent(savedOrder.googleEventId);
+    }
 
     try {
       const admins = await this.usuarioRepository.find({

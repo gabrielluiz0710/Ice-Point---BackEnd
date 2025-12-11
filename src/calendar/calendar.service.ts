@@ -122,13 +122,27 @@ export class CalendarService {
       });
 
       this.logger.log(`Evento criado na agenda da loja! Link: ${response.data.htmlLink}`);
-      return response.data;
+      return response.data.id;
 
     } catch (error) {
       this.logger.error(
         'Erro ao criar evento no Google Calendar', 
         error?.response?.data || error.message || error
       );
+    }
+  }
+
+  async deleteOrderEvent(googleEventId: string) {
+    if (!googleEventId) return;
+
+    try {
+      await this.calendar.events.delete({
+        calendarId: this.calendarId,
+        eventId: googleEventId,
+      });
+      this.logger.log(`Evento ${googleEventId} removido do Google Calendar.`);
+    } catch (error) {
+      this.logger.warn(`Falha ao remover evento do calendário: ${error.message}`);
     }
   }
 }

@@ -143,6 +143,9 @@ export class Encomendas {
   @Column({ name: 'motivo_cancelamento', type: 'text', nullable: true })
   motivoCancelamento: string;
 
+  @Column({ name: 'google_event_id', nullable: true })
+  googleEventId: string;
+
   @OneToMany(() => EncomendaItens, (item) => item.encomenda, { cascade: true })
   itens: EncomendaItens[];
 

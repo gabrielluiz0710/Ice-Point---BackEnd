@@ -319,7 +319,11 @@ export class CartService {
 
       if (fullOrder) {
         this.mailService.sendNewOrderEmails(fullOrder, adminEmails); 
-        this.calendarService.createOrderEvent(fullOrder, adminEmails);
+        const eventId = await this.calendarService.createOrderEvent(fullOrder, adminEmails);
+  
+        if (eventId) {
+          await manager.update(Encomendas, fullOrder.id, { googleEventId: eventId });
+        }
       }
 
       return {
