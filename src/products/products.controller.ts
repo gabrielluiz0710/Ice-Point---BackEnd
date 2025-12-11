@@ -60,7 +60,7 @@ export class ProductsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'funcionario')
+  @Roles('admin')
   @UseInterceptors(FilesInterceptor('files', 5))
   create(
     @Body() createProductDto: CreateProductDto,
@@ -71,7 +71,7 @@ export class ProductsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'funcionario')
+  @Roles('admin')
   @UseInterceptors(FilesInterceptor('files', 5))
   update(
     @Param('id') id: string,
@@ -83,7 +83,7 @@ export class ProductsController {
 
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'funcionario')
+  @Roles('admin')
   remove(@Param('id') id: string) {
     return this.productsService.remove(+id);
   }

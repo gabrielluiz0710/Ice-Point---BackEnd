@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
@@ -50,7 +51,7 @@ export class EncomendasService {
     };
 
     const statusFinalizados = [
-      EncomendaStatus.ENTREGUE,
+      EncomendaStatus.CONCLUIDO,
       EncomendaStatus.CANCELADO,
     ];
 
@@ -101,5 +102,43 @@ export class EncomendasService {
     }
 
     return order;
+  }
+
+  async cancelOrder(orderId: number, userId: string, motivo: string) {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: userId },
+    });
+    if (!usuario) throw new NotFoundException('Usuário inválido.');
+
+    const order = await this.encomendaRepository.findOne({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Pedido não encontrado.');
+    }
+
+    const isOwnerById = order.clienteId === userId;
+    const isOwnerByEmail = order.emailCliente?.toLowerCase() === usuario.email.toLowerCase();
+    const canManage = usuario.tipo === 'ADMIN' || usuario.tipo === 'FUNCIONARIO';
+
+    if (!isOwnerById && !isOwnerByEmail && !canManage) {
+      throw new ForbiddenException('Você não tem permissão para cancelar este pedido.');
+    }
+
+    if (order.status === EncomendaStatus.CANCELADO) {
+        throw new BadRequestException('Este pedido já está cancelado.');
+    }
+    if (order.status === EncomendaStatus.ENTREGUE) {
+        throw new BadRequestException('Não é possível cancelar um pedido já entregue.');
+    }
+    if (order.status === EncomendaStatus.CONCLUIDO) {
+        throw new BadRequestException('Não é possível cancelar um pedido já concluído.');
+    }
+
+    order.status = EncomendaStatus.CANCELADO;
+    order.motivoCancelamento = motivo;
+
+    return await this.encomendaRepository.save(order);
   }
 }

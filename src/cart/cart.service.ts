@@ -107,31 +107,38 @@ export class CartService {
   }
 
   async checkAvailability(dateString: string) {
-    const targetDate = new Date(dateString);
+    // O front manda ex: 2026-01-14T09:00:00
+    const requestDate = new Date(dateString);
 
-    if (isNaN(targetDate.getTime())) {
-      throw new Error('Data inválida fornecida.');
+    if (isNaN(requestDate.getTime())) {
+      throw new BadRequestException('Data inválida fornecida.');
     }
 
-    const windowStart = new Date(targetDate);
-    windowStart.setDate(targetDate.getDate() - 1);
-    windowStart.setHours(0, 0, 0, 0);
-
-    const windowEnd = new Date(targetDate);
-    windowEnd.setDate(targetDate.getDate() + 1);
-    windowEnd.setHours(23, 59, 59, 999);
+    // Janela de conflito:
+    // Se eu quero agendar para 20:00, não pode ter nada entre 08:00 (20-12) e 08:00 do dia seguinte (20+12).
+    // Qualquer encomenda que caia nesse miolo vai travar meu carrinho.
+    
+    const conflictStart = new Date(requestDate.getTime() - 12 * 60 * 60 * 1000); // -12 horas
+    const conflictEnd = new Date(requestDate.getTime() + 12 * 60 * 60 * 1000);   // +12 horas
 
     const busyCarts = await this.encomendasCarrinhosRepository
       .createQueryBuilder('ec')
       .innerJoin('ec.encomenda', 'e')
       .select('ec.carrinhoId')
-      .where('e.status != :status', { status: EncomendaStatus.CANCELADO })
-      .andWhere('e.data_agendada >= :start', { start: windowStart.toISOString().split('T')[0] })
-      .andWhere('e.data_agendada <= :end', { end: windowEnd.toISOString().split('T')[0] })
+      // Ignora cancelados e entregues (já liberados)
+      .where('e.status NOT IN (:...freeStatuses)', { 
+          freeStatuses: [EncomendaStatus.CANCELADO, EncomendaStatus.ENTREGUE] 
+      })
+      // A MÁGICA ESTÁ AQUI:
+      // O Postgres permite somar DATA + TIME para virar TIMESTAMP.
+      // Verificamos se o horário da encomenda existente cai dentro da nossa janela de perigo.
+      .andWhere("(e.data_agendada + e.hora_agendada) > :start", { start: conflictStart })
+      .andWhere("(e.data_agendada + e.hora_agendada) < :end", { end: conflictEnd })
       .getMany();
 
     const busyCartIds = busyCarts.map((bc) => bc.carrinhoId);
 
+    // --- Daqui para baixo continua igual ---
     const queryBuilder = this.carrinhoRepository.createQueryBuilder('c');
     
     queryBuilder.where('c.status = :statusCarrinho', { statusCarrinho: 'DISPONIVEL' });
@@ -142,7 +149,7 @@ export class CartService {
 
     const availableCarts = await queryBuilder.getMany();
 
-    const summary = {
+    return {
       totalAvailable: availableCarts.length,
       details: availableCarts.map((c) => ({
         id: c.id,
@@ -156,8 +163,6 @@ export class CartService {
         return acc;
       }, {}),
     };
-
-    return summary;
   }
 
   private toIsoDate(value: string | Date | undefined): string | null {

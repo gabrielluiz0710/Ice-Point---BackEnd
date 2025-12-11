@@ -1,9 +1,21 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToMany, JoinTable, CreateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  ManyToMany,
+  JoinTable,
+  CreateDateColumn,
+} from 'typeorm';
 import { EncomendaItens } from './encomenda-itens.entity';
 import { Carrinho } from '../carrinhos/carrinho.entity';
-import { EncomendaStatus, MetodoEntrega, MetodoPagamento } from './encomenda.enums';
+import {
+  EncomendaStatus,
+  MetodoEntrega,
+  MetodoPagamento,
+} from './encomenda.enums';
 
-@Entity('encomendas') 
+@Entity('encomendas')
 export class Encomendas {
   @PrimaryGeneratedColumn()
   id: number;
@@ -14,7 +26,7 @@ export class Encomendas {
   @Column({ name: 'nome_cliente', nullable: true })
   nomeCliente: string;
 
-  @Column({ name: 'email_cliente', nullable: true  })
+  @Column({ name: 'email_cliente', nullable: true })
   emailCliente: string;
 
   @Column({ name: 'telefone_cliente', length: 20, nullable: true })
@@ -24,9 +36,12 @@ export class Encomendas {
   cpfCliente: string;
 
   @Column({ type: 'date', name: 'data_nascimento_cliente', nullable: true })
-dataNascimentoCliente: string | null;
+  dataNascimentoCliente: string | null;
 
-  @CreateDateColumn({ name: 'data_solicitacao', type: 'timestamp with time zone' })
+  @CreateDateColumn({
+    name: 'data_solicitacao',
+    type: 'timestamp with time zone',
+  })
   dataSolicitacao: Date;
 
   @Column({ type: 'date', name: 'data_agendada', nullable: true })
@@ -35,10 +50,22 @@ dataNascimentoCliente: string | null;
   @Column({ type: 'time', name: 'hora_agendada', nullable: true })
   horaAgendada: string;
 
-  @Column({ type: 'enum', enum: MetodoEntrega, name: 'metodo_entrega', nullable: true })
+  @Column({
+    type: 'enum',
+    enum: MetodoEntrega,
+    name: 'metodo_entrega',
+    nullable: true,
+  })
   metodoEntrega: MetodoEntrega;
 
-  @Column({ type: 'numeric', precision: 10, scale: 2, default: 0, name: 'taxa_entrega', nullable: true })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'taxa_entrega',
+    nullable: true,
+  })
   taxaEntrega: number;
 
   @Column({ name: 'endereco_cep', nullable: true })
@@ -62,16 +89,42 @@ dataNascimentoCliente: string | null;
   @Column({ name: 'endereco_estado', nullable: true })
   enderecoEstado: string;
 
-  @Column({ type: 'numeric', precision: 10, scale: 2, default: 0, name: 'valor_produtos', nullable: true })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'valor_produtos',
+    nullable: true,
+  })
   valorProdutos: number;
 
-  @Column({ type: 'numeric', precision: 10, scale: 2, default: 0, name: 'valor_desconto', nullable: true })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'valor_desconto',
+    nullable: true,
+  })
   valorDesconto: number;
 
-  @Column({ type: 'numeric', precision: 10, scale: 2, default: 0, name: 'valor_total', nullable: true })
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    name: 'valor_total',
+    nullable: true,
+  })
   valorTotal: number;
 
-  @Column({ type: 'enum', enum: MetodoPagamento, name: 'metodo_pagamento', nullable: true })
+  @Column({
+    type: 'enum',
+    enum: MetodoPagamento,
+    name: 'metodo_pagamento',
+    nullable: true,
+  })
   metodoPagamento: MetodoPagamento;
 
   @Column({ name: 'status_pagamento', default: 'PENDENTE' })
@@ -80,10 +133,17 @@ dataNascimentoCliente: string | null;
   @Column({ name: 'id_pagamento_externo', nullable: true })
   idPagamentoExterno: string;
 
-  @Column({ type: 'enum', enum: EncomendaStatus, default: EncomendaStatus.PENDENTE })
+  @Column({
+    type: 'enum',
+    enum: EncomendaStatus,
+    default: EncomendaStatus.PENDENTE,
+  })
   status: EncomendaStatus;
-  
-  @OneToMany(() => EncomendaItens, item => item.encomenda, { cascade: true })
+
+  @Column({ name: 'motivo_cancelamento', type: 'text', nullable: true })
+  motivoCancelamento: string;
+
+  @OneToMany(() => EncomendaItens, (item) => item.encomenda, { cascade: true })
   itens: EncomendaItens[];
 
   @ManyToMany(() => Carrinho)
