@@ -8,12 +8,14 @@ import { EncomendasCarrinhos } from '../encomendas/encomendas-carrinhos.entity';
 import { Product } from '../products/entities/product.entity'; 
 import { Carrinho } from '../carrinhos/carrinho.entity';
 import { Usuarios } from '../users/usuarios.entity';
+import { MailService } from '../mail/mail.service';
+import { CalendarService } from '../calendar/calendar.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Encomendas, EncomendaItens, Product, Carrinho, Usuarios, EncomendasCarrinhos]),
   ],
   controllers: [CartController],
-  providers: [CartService],
+  providers: [CartService, MailService, CalendarService],
 })
 export class CartModule {}

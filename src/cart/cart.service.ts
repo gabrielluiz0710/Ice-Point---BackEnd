@@ -21,6 +21,8 @@ import { Usuarios } from '../users/usuarios.entity';
 import { EncomendaStatus, MetodoEntrega, MetodoPagamento } from '../encomendas/encomenda.enums'; 
 import { CheckoutDto } from './dto/checkout.dto';
 import { EncomendasCarrinhos } from '../encomendas/encomendas-carrinhos.entity'; 
+import { MailService } from '../mail/mail.service';
+import { CalendarService } from '../calendar/calendar.service';
 
 @Injectable()
 export class CartService {
@@ -37,6 +39,8 @@ export class CartService {
     private readonly usuarioRepository: Repository<Usuarios>,
     @InjectRepository(EncomendasCarrinhos)
     private readonly encomendasCarrinhosRepository: Repository<EncomendasCarrinhos>,
+    private readonly mailService: MailService,
+    private readonly calendarService: CalendarService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -107,38 +111,28 @@ export class CartService {
   }
 
   async checkAvailability(dateString: string) {
-    // O front manda ex: 2026-01-14T09:00:00
     const requestDate = new Date(dateString);
 
     if (isNaN(requestDate.getTime())) {
       throw new BadRequestException('Data inválida fornecida.');
     }
-
-    // Janela de conflito:
-    // Se eu quero agendar para 20:00, não pode ter nada entre 08:00 (20-12) e 08:00 do dia seguinte (20+12).
-    // Qualquer encomenda que caia nesse miolo vai travar meu carrinho.
     
-    const conflictStart = new Date(requestDate.getTime() - 12 * 60 * 60 * 1000); // -12 horas
-    const conflictEnd = new Date(requestDate.getTime() + 12 * 60 * 60 * 1000);   // +12 horas
+    const conflictStart = new Date(requestDate.getTime() - 12 * 60 * 60 * 1000); 
+    const conflictEnd = new Date(requestDate.getTime() + 12 * 60 * 60 * 1000);  
 
     const busyCarts = await this.encomendasCarrinhosRepository
       .createQueryBuilder('ec')
       .innerJoin('ec.encomenda', 'e')
       .select('ec.carrinhoId')
-      // Ignora cancelados e entregues (já liberados)
       .where('e.status NOT IN (:...freeStatuses)', { 
           freeStatuses: [EncomendaStatus.CANCELADO, EncomendaStatus.ENTREGUE] 
       })
-      // A MÁGICA ESTÁ AQUI:
-      // O Postgres permite somar DATA + TIME para virar TIMESTAMP.
-      // Verificamos se o horário da encomenda existente cai dentro da nossa janela de perigo.
       .andWhere("(e.data_agendada + e.hora_agendada) > :start", { start: conflictStart })
       .andWhere("(e.data_agendada + e.hora_agendada) < :end", { end: conflictEnd })
       .getMany();
 
     const busyCartIds = busyCarts.map((bc) => bc.carrinhoId);
 
-    // --- Daqui para baixo continua igual ---
     const queryBuilder = this.carrinhoRepository.createQueryBuilder('c');
     
     queryBuilder.where('c.status = :statusCarrinho', { statusCarrinho: 'DISPONIVEL' });
@@ -311,6 +305,22 @@ export class CartService {
         valorTotal: valorTotalFinal,
         status: savedCart.status
       });
+
+      const fullOrder = await manager.findOne(Encomendas, {
+        where: { id: savedCart.id },
+        relations: ['itens', 'itens.produto', 'itens.produto.categoria', 'carrinhos'],
+      });
+
+      const admins = await manager.find(Usuarios, {
+        where: { tipo: 'ADMIN' },
+        select: ['email'],
+      });
+      const adminEmails = admins.map(u => u.email).filter(email => !!email);
+
+      if (fullOrder) {
+        this.mailService.sendNewOrderEmails(fullOrder, adminEmails); 
+        this.calendarService.createOrderEvent(fullOrder, adminEmails);
+      }
 
       return {
         success: true,

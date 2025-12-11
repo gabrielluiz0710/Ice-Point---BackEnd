@@ -9,6 +9,7 @@ import { Repository, Not } from 'typeorm';
 import { Encomendas } from './encomendas.entity';
 import { Usuarios } from '../users/usuarios.entity';
 import { EncomendaStatus } from './encomenda.enums';
+import { MailService } from '../mail/mail.service';
 
 export interface PedidoResumido {
   id: number;
@@ -26,6 +27,7 @@ export class EncomendasService {
     private readonly encomendaRepository: Repository<Encomendas>,
     @InjectRepository(Usuarios)
     private readonly usuarioRepository: Repository<Usuarios>,
+    private readonly mailService: MailService,
   ) {}
 
   async findAllByUserEmail(userId: string) {
@@ -139,6 +141,20 @@ export class EncomendasService {
     order.status = EncomendaStatus.CANCELADO;
     order.motivoCancelamento = motivo;
 
-    return await this.encomendaRepository.save(order);
+    const savedOrder = await this.encomendaRepository.save(order);
+
+    try {
+      const admins = await this.usuarioRepository.find({
+        where: { tipo: 'ADMIN' },
+        select: ['email'],
+      });
+      const adminEmails = admins.map((u) => u.email).filter((e) => !!e);
+
+      this.mailService.sendCancellationEmails(savedOrder, adminEmails);
+    } catch (error) {
+      console.error('Erro ao tentar enviar email de cancelamento:', error);
+    }
+
+    return savedOrder;
   }
 }
