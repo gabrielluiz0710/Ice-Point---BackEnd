@@ -10,6 +10,7 @@ import { EnderecosModule } from './enderecos/enderecos.module';
 import { GoogleReviewsModule } from './google-reviews/google-reviews.module';
 import { PaymentModule } from './payment/payment.module';
 import { EncomendasModule } from './encomendas/encomendas.module';
+import { ShippingModule } from './shipping/shipping.module';
 
 @Module({
   imports: [
@@ -46,7 +47,8 @@ import { EncomendasModule } from './encomendas/encomendas.module';
     ProductsModule,
     GoogleReviewsModule,
     PaymentModule,
-    EncomendasModule
+    EncomendasModule,
+    ShippingModule
   ],
   controllers: [],
   providers: [],

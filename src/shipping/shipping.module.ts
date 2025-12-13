@@ -1,0 +1,12 @@
+import { Module } from '@nestjs/common';
+import { ShippingService } from './shipping.service';
+import { ShippingController } from './shipping.controller';
+import { HttpModule } from '@nestjs/axios';
+import { ConfigModule } from '@nestjs/config';
+
+@Module({
+  imports: [HttpModule, ConfigModule],
+  controllers: [ShippingController],
+  providers: [ShippingService],
+})
+export class ShippingModule {}
