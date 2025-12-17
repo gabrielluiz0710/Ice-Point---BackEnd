@@ -10,9 +10,22 @@ export class CalendarService {
   private calendarId = process.env.GOOGLE_CALENDAR_ID;
 
   constructor() {
+    let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+
+    if (!privateKey){
+      this.logger.error('GOOGLE_PRIVATE_KEY não definida');
+      throw new Error ('GOOGLE_PRIVATE_KEY missing');
+    }
+
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')){
+      privateKey = privateKey.slice(1, -1);
+    }
+
+    privateKey = privateKey.replace(/\\n/g, '\n');
+
     const auth = new google.auth.JWT({
       email: process.env.GOOGLE_CLIENT_EMAIL,
-      key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+      key: privateKey,
       scopes: ['https://www.googleapis.com/auth/calendar'],
     });
 

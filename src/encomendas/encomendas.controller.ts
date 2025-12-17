@@ -9,14 +9,28 @@ import {
   ParseIntPipe,
   Patch,
   Body,
+  Query,
 } from '@nestjs/common';
 import { EncomendasService } from './encomendas.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CancelarEncomendaDto } from './dto/cancelar-encomenda.dto';
+import { RolesGuard } from '../auth/roles.guard'; 
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('encomendas')
 export class EncomendasController {
   constructor(private readonly encomendasService: EncomendasService) {}
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'FUNCIONARIO') 
+  @Get('ativas') // <--- Agora o Nest verifica isso antes do :id
+  async findActiveOrders(
+    @Query('startDate') startDate: string
+  ) {
+    // Se não passar data, usa a de hoje
+    const date = startDate || new Date().toISOString().split('T')[0];
+    return await this.encomendasService.findActiveOrdersByWeek(date);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get()

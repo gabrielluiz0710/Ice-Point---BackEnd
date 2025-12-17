@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not } from 'typeorm';
+import { Repository, Not, In, Between } from 'typeorm';
 import { Encomendas } from './encomendas.entity';
 import { Usuarios } from '../users/usuarios.entity';
 import { EncomendaStatus } from './encomenda.enums';
@@ -162,5 +162,54 @@ export class EncomendasService {
     }
 
     return savedOrder;
+  }
+
+  async findActiveOrdersByWeek(startDateStr: string) {
+    // 1. Converter a string de data inicial para objeto Date
+    const startDate = new Date(startDateStr);
+    
+    // Validar se a data é válida
+    if (isNaN(startDate.getTime())) {
+       throw new BadRequestException('Data inicial inválida.');
+    }
+
+    // 2. Calcular a data final (Start Date + 7 dias)
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 7);
+
+    // Formatar para YYYY-MM-DD para garantir compatibilidade com coluna type: 'date'
+    // Nota: Dependendo do driver do banco, objetos Date funcionam, mas strings são mais seguras para comparadores de data pura.
+    const startIso = startDate.toISOString().split('T')[0];
+    const endIso = endDate.toISOString().split('T')[0];
+
+    // 3. Definir status que NÃO queremos (histórico)
+    const statusFinalizados = [
+      EncomendaStatus.CONCLUIDO,
+      EncomendaStatus.CANCELADO,
+      EncomendaStatus.PENDENTE 
+    ];
+
+    const encomendas = await this.encomendaRepository.find({
+      where: {
+        // Busca onde status NÃO é concluído/cancelado
+        status: Not(In(statusFinalizados)),
+        // Busca no intervalo de datas
+        dataAgendada: Between(startIso, endIso),
+      },
+      order: {
+        dataAgendada: 'ASC', // Do dia mais próximo para o mais distante
+        horaAgendada: 'ASC', // Das primeiras horas do dia para o fim do dia
+      },
+      relations: ['itens', 'itens.produto'], // Traz os itens se necessário para o front-end de admin
+    });
+
+    return {
+      periodo: {
+        inicio: startIso,
+        fim: endIso
+      },
+      total: encomendas.length,
+      data: encomendas
+    };
   }
 }
