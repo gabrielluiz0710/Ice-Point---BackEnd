@@ -10,18 +10,32 @@ export class CalendarService {
   private calendarId = process.env.GOOGLE_CALENDAR_ID;
 
   constructor() {
-    let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+    let privateKey: string;
 
-    if (!privateKey){
-      this.logger.error('GOOGLE_PRIVATE_KEY não definida');
-      throw new Error ('GOOGLE_PRIVATE_KEY missing');
+    if (process.env.GOOGLE_PRIVATE_KEY_BASE64){
+      try{
+        privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_BASE64, 'base64').toString('utf-8');
+      } catch (e){
+        this.logger.error('Falha ao decodificar GOOGLE_PRIVATE_KEY_BASE64')
+        throw e;
+      }
     }
-
-    if (privateKey.startsWith('"') && privateKey.endsWith('"')){
-      privateKey = privateKey.slice(1, -1);
+    else if (process.env.GOOGLE_PRIVATE_KEY) {
+      privateKey = process.env.GOOGLE_PRIVATE_KEY;
+      
+      if (privateKey.startsWith('"') && privateKey.endsWith('"')){
+        privateKey = privateKey.slice(1, -1);
+      }
+      privateKey = privateKey.replace(/\\n/g, '\n');
+    } 
+    else {
+      this.logger.error('Nenhuma chave privada do Google encontrada (GOOGLE_PRIVATE_KEY_BASE64 ou GOOGLE_PRIVATE_KEY)');
+      throw new Error('Google Private Key missing');
     }
-
-    privateKey = privateKey.replace(/\\n/g, '\n');
+    if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')){
+      this.logger.error('Formato de chave inválido.');
+      throw new Error ('Invalid Key Format')
+    }
 
     const auth = new google.auth.JWT({
       email: process.env.GOOGLE_CLIENT_EMAIL,
