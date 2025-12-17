@@ -23,13 +23,19 @@ export class EncomendasController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'FUNCIONARIO') 
-  @Get('ativas') // <--- Agora o Nest verifica isso antes do :id
+  @Get('ativas')
   async findActiveOrders(
     @Query('startDate') startDate: string
   ) {
-    // Se não passar data, usa a de hoje
     const date = startDate || new Date().toISOString().split('T')[0];
     return await this.encomendasService.findActiveOrdersByWeek(date);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'FUNCIONARIO')
+  @Get('detalhes/:id')
+  async findOneDetails(@Param('id', ParseIntPipe) id: number) {
+    return await this.encomendasService.findOneByAdmin(id);
   }
 
   @UseGuards(JwtAuthGuard)
