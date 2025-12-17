@@ -32,6 +32,10 @@ export class CalendarService {
       this.logger.error('Nenhuma chave privada do Google encontrada (GOOGLE_PRIVATE_KEY_BASE64 ou GOOGLE_PRIVATE_KEY)');
       throw new Error('Google Private Key missing');
     }
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    }
+    privateKey = privateKey.replace(/\\n/g, '\n');
     if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')){
       this.logger.error('Formato de chave inválido.');
       throw new Error ('Invalid Key Format')
