@@ -23,6 +23,7 @@ import { CheckoutDto } from './dto/checkout.dto';
 import { EncomendasCarrinhos } from '../encomendas/encomendas-carrinhos.entity'; 
 import { MailService } from '../mail/mail.service';
 import { CalendarService } from '../calendar/calendar.service';
+import { AdminCreateOrderDto } from './dto/admin-create-order.dto';
 
 @Injectable()
 export class CartService {
@@ -337,6 +338,143 @@ export class CartService {
           total: valorTotalFinal
         },
         message: 'Pedido realizado com sucesso!',
+      };
+    });
+  }
+
+  async createOrderByAdmin(dto: AdminCreateOrderDto) {
+    return await this.dataSource.transaction(async (manager) => {
+      const usuario = await manager.findOne(Usuarios, { 
+        where: { email: dto.email } 
+      });
+
+      const newOrder = manager.create(Encomendas, {
+        clienteId: usuario ? usuario.id : null,
+        nomeCliente: dto.fullName,
+        emailCliente: dto.email,
+        telefoneCliente: dto.phone || usuario?.telefone || '',
+        cpfCliente: dto.cpf || usuario?.cpf || '',
+        dataNascimentoCliente: dto.birthDate ? this.toIsoDate(dto.birthDate) : (usuario?.data_nascimento ? this.toIsoDate(usuario.data_nascimento) : null),
+        
+        dataSolicitacao: new Date(),
+        dataAgendada: this.toIsoDate(dto.dataAgendada) as string,
+        horaAgendada: dto.horaAgendada,
+        
+        metodoEntrega: dto.metodoEntrega,
+        metodoPagamento: dto.metodoPagamento,
+        
+        // Endereço
+        enderecoCep: dto.enderecoCep,
+        enderecoLogradouro: dto.enderecoLogradouro,
+        enderecoNumero: dto.enderecoNumero,
+        enderecoBairro: dto.enderecoBairro,
+        enderecoCidade: dto.enderecoCidade,
+        enderecoEstado: dto.enderecoEstado,
+
+        // Status inicial já confirmado (admin lançando)
+        status: EncomendaStatus.CONFIRMADO, 
+        itens: []
+      });
+
+      // 3. Vincular Carrinhos Físicos (se houver)
+      if (dto.cartIds && dto.cartIds.length > 0) {
+        const carrinhos = await manager.findBy(Carrinho, { id: In(dto.cartIds) });
+        if (carrinhos.length !== dto.cartIds.length) {
+           throw new BadRequestException('Alguns carrinhos selecionados não foram encontrados.');
+        }
+        newOrder.carrinhos = carrinhos;
+      }
+
+      // Salva a encomenda inicial para gerar o ID
+      const savedOrder = await manager.save(newOrder);
+
+      // 4. Processar Itens
+      let somaProdutos = 0;
+      const itensParaSalvar: EncomendaItens[] = [];
+
+      // Agrupa itens repetidos
+      const itemsMap = new Map<number, number>();
+      dto.items.forEach((item) => {
+        if (item.quantity > 0) {
+          const currentQty = itemsMap.get(item.productId) || 0;
+          itemsMap.set(item.productId, currentQty + item.quantity);
+        }
+      });
+
+      for (const [productId, quantity] of itemsMap.entries()) {
+        const produto = await manager.findOne(Product, { where: { id: productId } });
+        if (!produto) throw new NotFoundException(`Produto ID ${productId} não encontrado.`);
+        
+        const preco = Number(produto.preco_unitario);
+
+        const novoItem = manager.create(EncomendaItens, {
+          encomenda: { id: savedOrder.id },
+          produto: { id: productId },
+          quantidade: quantity,
+          precoUnitarioCongelado: preco,
+        });
+
+        itensParaSalvar.push(novoItem);
+        somaProdutos += preco * quantity;
+      }
+
+      if (itensParaSalvar.length > 0) {
+        await manager.save(itensParaSalvar);
+      }
+
+      // 5. Calcular Totais (Frete e Desconto)
+      let taxaEntrega = 0;
+      if (savedOrder.metodoEntrega === MetodoEntrega.DELIVERY) {
+        taxaEntrega = 20.00; // Regra fixa, ou pode vir do DTO se quiser flexibilizar no futuro
+      }
+
+      let valorDesconto = 0;
+      if (
+        savedOrder.metodoPagamento === MetodoPagamento.PIX ||
+        savedOrder.metodoPagamento === MetodoPagamento.CASH
+      ) {
+        valorDesconto = somaProdutos * 0.10; // 10% desconto
+      }
+
+      const valorTotalFinal = somaProdutos + taxaEntrega - valorDesconto;
+
+      await manager.update(Encomendas, savedOrder.id, {
+        valorProdutos: somaProdutos,
+        taxaEntrega: taxaEntrega,
+        valorDesconto: valorDesconto,
+        valorTotal: valorTotalFinal,
+      });
+
+      const fullOrder = await manager.findOne(Encomendas, {
+        where: { id: savedOrder.id },
+        relations: ['itens', 'itens.produto', 'itens.produto.categoria', 'carrinhos'],
+      });
+
+      if (!fullOrder) throw new Error('Erro crítico ao recuperar pedido criado.');
+
+      try {
+        const admins = await manager.find(Usuarios, {
+            where: { tipo: 'ADMIN' },
+            select: ['email'],
+        });
+        const adminEmails = admins.map(u => u.email).filter(email => !!email);
+        
+        this.mailService.sendNewOrderEmails(fullOrder, adminEmails);
+
+        const eventId = await this.calendarService.createOrderEvent(fullOrder, adminEmails);
+        if (eventId) {
+            await manager.update(Encomendas, fullOrder.id, { googleEventId: eventId });
+        }
+
+      } catch (error) {
+          console.error("Erro nos serviços de terceiro (Email/Calendar) para pedido Admin:", error);
+      }
+
+      return {
+        success: true,
+        orderId: fullOrder.id,
+        message: 'Encomenda lançada com sucesso pelo Admin!',
+        total: valorTotalFinal
       };
     });
   }

@@ -6,127 +6,127 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as sharp from 'sharp';
 
 const CART_IMAGES: Record<string, string> = {
-    azul: 'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/azul.webp',
-    rosa: 'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/rosa.webp',
-    'azul/rosa':
-        'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/misto.webp',
-    misto:
-        'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/misto.webp',
-    default:
-        'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/misto.webp',
+  azul: 'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/azul.webp',
+  rosa: 'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/rosa.webp',
+  'azul/rosa':
+    'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/misto.webp',
+  misto:
+    'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/misto.webp',
+  default:
+    'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/misto.webp',
 };
 
 const LOGO_FULL = 'https://www.icepoint.com.br/assets/logo_full-CTT1BAul.png';
 const LOGO_WHITE =
-    'https://www.icepoint.com.br/assets/logo_branca-trhWD2Xw.png';
+  'https://www.icepoint.com.br/assets/logo_branca-trhWD2Xw.png';
 const LINK_PERFIL = 'https://www.icepoint.com.br/perfil';
 
 @Injectable()
 export class MailService {
-    private resend: Resend;
-    private supabase: SupabaseClient;
-    private logger = new Logger(MailService.name);
+  private resend: Resend;
+  private supabase: SupabaseClient;
+  private logger = new Logger(MailService.name);
 
-    constructor() {
-        this.resend = new Resend(process.env.RESEND_KEY);
-        this.supabase = createClient(
-            process.env.SUPABASE_URL ?? '',
-            process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
-        );
+  constructor() {
+    this.resend = new Resend(process.env.RESEND_KEY);
+    this.supabase = createClient(
+      process.env.SUPABASE_URL ?? '',
+      process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+    );
+  }
+
+  private async ensurePngUrl(originalUrl: string): Promise<string> {
+    if (!originalUrl)
+      return 'https://cdn-icons-png.flaticon.com/512/938/938063.png';
+
+    if (!originalUrl.toLowerCase().endsWith('.webp')) {
+      return originalUrl;
     }
 
-    private async ensurePngUrl(originalUrl: string): Promise<string> {
-        if (!originalUrl)
-            return 'https://cdn-icons-png.flaticon.com/512/938/938063.png';
+    try {
+      const pngUrl = originalUrl.replace(/\.webp$/i, '.png');
 
-        if (!originalUrl.toLowerCase().endsWith('.webp')) {
-            return originalUrl;
-        }
+      const checkResponse = await fetch(pngUrl, { method: 'HEAD' });
+      if (checkResponse.ok) {
+        return pngUrl;
+      }
 
-        try {
-            const pngUrl = originalUrl.replace(/\.webp$/i, '.png');
+      const bucketName = 'images';
+      const publicMarker = `/storage/v1/object/public/${bucketName}/`;
 
-            const checkResponse = await fetch(pngUrl, { method: 'HEAD' });
-            if (checkResponse.ok) {
-                return pngUrl;
-            }
+      if (!originalUrl.includes(publicMarker)) {
+        return originalUrl;
+      }
 
-            const bucketName = 'images';
-            const publicMarker = `/storage/v1/object/public/${bucketName}/`;
+      const path = originalUrl.split(publicMarker)[1];
+      const newPath = path.replace(/\.webp$/i, '.png');
 
-            if (!originalUrl.includes(publicMarker)) {
-                return originalUrl;
-            }
+      const imageResponse = await fetch(originalUrl);
+      if (!imageResponse.ok) throw new Error('Falha ao baixar imagem original');
+      const arrayBuffer = await imageResponse.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
-            const path = originalUrl.split(publicMarker)[1];
-            const newPath = path.replace(/\.webp$/i, '.png');
+      const pngBuffer = await sharp(buffer)
+        .png({ quality: 80, compressionLevel: 8 })
+        .toBuffer();
 
-            const imageResponse = await fetch(originalUrl);
-            if (!imageResponse.ok) throw new Error('Falha ao baixar imagem original');
-            const arrayBuffer = await imageResponse.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
+      const { error } = await this.supabase.storage
+        .from(bucketName)
+        .upload(newPath, pngBuffer, {
+          contentType: 'image/png',
+          upsert: true,
+        });
 
-            const pngBuffer = await sharp(buffer)
-                .png({ quality: 80, compressionLevel: 8 })
-                .toBuffer();
+      if (error) {
+        this.logger.error(`Erro ao subir PNG para o storage: ${error.message}`);
+        return originalUrl;
+      }
 
-            const { error } = await this.supabase.storage
-                .from(bucketName)
-                .upload(newPath, pngBuffer, {
-                    contentType: 'image/png',
-                    upsert: true,
-                });
-
-            if (error) {
-                this.logger.error(`Erro ao subir PNG para o storage: ${error.message}`);
-                return originalUrl;
-            }
-
-            const { data } = this.supabase.storage
-                .from(bucketName)
-                .getPublicUrl(newPath);
-            this.logger.log(`Imagem convertida com sucesso: ${data.publicUrl}`);
-            return data.publicUrl;
-        } catch (error) {
-            this.logger.error(`Erro ao converter imagem ${originalUrl}:`, error);
-            return originalUrl;
-        }
+      const { data } = this.supabase.storage
+        .from(bucketName)
+        .getPublicUrl(newPath);
+      this.logger.log(`Imagem convertida com sucesso: ${data.publicUrl}`);
+      return data.publicUrl;
+    } catch (error) {
+      this.logger.error(`Erro ao converter imagem ${originalUrl}:`, error);
+      return originalUrl;
     }
+  }
 
-    private formatCurrency(value: number): string {
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-        }).format(value);
-    }
+  private formatCurrency(value: number): string {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  }
 
-    private formatDate(dateStr: string): string {
-        if (!dateStr) return '';
+  private formatDate(dateStr: string): string {
+    if (!dateStr) return '';
 
-        const date = new Date(dateStr);
+    const date = new Date(dateStr);
 
-        return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
-    }
+    return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
+  }
 
-    private getCartImage(color: string): string {
-        if (!color) return CART_IMAGES['default'];
+  private getCartImage(color: string): string {
+    if (!color) return CART_IMAGES['default'];
 
-        const normalizedColor = color.toLowerCase().trim();
+    const normalizedColor = color.toLowerCase().trim();
 
-        return CART_IMAGES[normalizedColor] || CART_IMAGES['default'];
-    }
+    return CART_IMAGES[normalizedColor] || CART_IMAGES['default'];
+  }
 
-    private getCartImageUrl(color: string): string {
-        if (!color) return CART_IMAGES['default'];
-        const normalizedColor = color.toLowerCase().trim();
-        return CART_IMAGES[normalizedColor] || CART_IMAGES['default'];
-    }
+  private getCartImageUrl(color: string): string {
+    if (!color) return CART_IMAGES['default'];
+    const normalizedColor = color.toLowerCase().trim();
+    return CART_IMAGES[normalizedColor] || CART_IMAGES['default'];
+  }
 
-    private generateProgressBar(status: string): string {
-        const activeColor = '#0070f3';
-        const inactiveColor = '#e0e0e0';
+  private generateProgressBar(status: string): string {
+    const activeColor = '#0070f3';
+    const inactiveColor = '#e0e0e0';
 
-        return `
+    return `
       <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
         <tr>
           <td align="center" width="25%">
@@ -153,24 +153,32 @@ export class MailService {
         </tr>
       </table>
     `;
-    }
+  }
 
-    private generateOrderTemplate(
-        order: Encomendas,
-        isClient: boolean,
-        processedImages: { products: Record<number, string>, carts: Record<number, string> }
-    ): string {
-        const isDelivery = order.metodoEntrega === MetodoEntrega.DELIVERY;
-        const title = isClient ? 'A festa vai começar! 🥳' : '🔔 Novo Pedido Recebido';
-        const subTitle = isClient ? 'Seu pedido foi confirmado com sucesso.' : `Pedido #${order.id} realizado.`;
+  private generateOrderTemplate(
+    order: Encomendas,
+    isClient: boolean,
+    processedImages: {
+      products: Record<number, string>;
+      carts: Record<number, string>;
+    },
+  ): string {
+    const isDelivery = order.metodoEntrega === MetodoEntrega.DELIVERY;
+    const title = isClient
+      ? 'A festa vai começar! 🥳'
+      : '🔔 Novo Pedido Recebido';
+    const subTitle = isClient
+      ? 'Seu pedido foi confirmado com sucesso.'
+      : `Pedido #${order.id} realizado.`;
 
-        const productsHtml = order.itens
-            .map((item) => {
-                const imgUrl = processedImages.products[item.produto.id] ||
-                    (item.produto as any)?.imagemCapa ||
-                    'https://cdn-icons-png.flaticon.com/512/938/938063.png';
+    const productsHtml = order.itens
+      .map((item) => {
+        const imgUrl =
+          processedImages.products[item.produto.id] ||
+          (item.produto as any)?.imagemCapa ||
+          'https://cdn-icons-png.flaticon.com/512/938/938063.png';
 
-                return `
+        return `
       <tr>
         <td width="70" style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; vertical-align: middle;">
           <img src="${imgUrl}" alt="${item.produto?.nome}" width="60" style="width: 60px; height: auto; border-radius: 8px; display: block; margin: 0 auto;">
@@ -182,30 +190,32 @@ export class MailService {
         <td style="padding: 10px; text-align: right; font-weight: 600; color: #333; border-bottom: 1px solid #f0f0f0; vertical-align: middle;">${this.formatCurrency(Number(item.precoUnitarioCongelado))}</td>
       </tr>
     `;
-            })
-            .join('');
+      })
+      .join('');
 
-        const cartsHtml =
-            order.carrinhos && order.carrinhos.length > 0
-                ? `
+    const cartsHtml =
+      order.carrinhos && order.carrinhos.length > 0
+        ? `
         <div style="background-color: #f8faff; border: 1px dashed #0070f3; border-radius: 12px; padding: 20px; margin: 20px 0; text-align: center;">
           <p style="margin: 0 0 15px 0; color: #0070f3; font-weight: bold; text-transform: uppercase; font-size: 12px; letter-spacing: 1px;">Carrinho(s) da Festa</p>
           ${order.carrinhos
-                    .map((c) => {
-                        const cartImgUrl = processedImages.carts[c.id] || this.getCartImageUrl(c.cor);
-                        return `
+            .map((c) => {
+              const cartImgUrl =
+                processedImages.carts[c.id] || this.getCartImageUrl(c.cor);
+              return `
             <div style="display: inline-block; margin: 0 10px; vertical-align: top; width: 120px;">
               <img src="${cartImgUrl}" alt="Carrinho ${c.cor}" width="120" style="width: 120px; height: auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: block; margin: 0 auto;">
               <p style="font-size: 12px; color: #555; margin-top: 8px; text-transform: capitalize;"><strong>Cor: ${c.cor || 'Padrão'}</strong></p>
             </div>
-          `})
-                    .join('')}
+          `;
+            })
+            .join('')}
         </div>
       `
-                : '';
+        : '';
 
-        const addressHtml = isDelivery
-            ? `
+    const addressHtml = isDelivery
+      ? `
         <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 20px; margin-top: 20px; display: flex; align-items: center;">
           <div style="width: 100%;">
             <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px;">📍 Onde vamos entregar</h3>
@@ -217,7 +227,7 @@ export class MailService {
           </div>
         </div>
       `
-            : `
+      : `
         <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 12px; padding: 20px; margin-top: 20px; text-align: center;">
           <img src="https://cdn-icons-png.flaticon.com/512/709/709790.png" width="40" style="opacity: 0.8; margin-bottom: 10px;">
           <h3 style="margin: 0; color: #1565c0;">Retirada na Loja</h3>
@@ -225,7 +235,7 @@ export class MailService {
         </div>
       `;
 
-        return `
+    return `
       <!DOCTYPE html>
       <html>
       <head>
@@ -304,18 +314,23 @@ export class MailService {
       </body>
       </html>
     `;
-    }
+  }
 
-    private generateCancellationTemplate(order: Encomendas, isClient: boolean): string {
-        const isDelivery = order.metodoEntrega === MetodoEntrega.DELIVERY;
+  private generateCancellationTemplate(
+    order: Encomendas,
+    isClient: boolean,
+  ): string {
+    const isDelivery = order.metodoEntrega === MetodoEntrega.DELIVERY;
 
-        const title = isClient ? 'Poxa, pedido cancelado 😕' : '⚠️ Pedido Cancelado';
-        const subTitle = isClient
-            ? 'Seu pedido foi cancelado. Veja os detalhes abaixo.'
-            : `O Pedido #${order.id} foi cancelado no sistema.`;
+    const title = isClient
+      ? 'Poxa, pedido cancelado 😕'
+      : '⚠️ Pedido Cancelado';
+    const subTitle = isClient
+      ? 'Seu pedido foi cancelado. Veja os detalhes abaixo.'
+      : `O Pedido #${order.id} foi cancelado no sistema.`;
 
-        const addressHtml = isDelivery
-            ? `
+    const addressHtml = isDelivery
+      ? `
         <div style="background: #fff; border: 1px solid #eee; border-radius: 12px; padding: 20px; margin-top: 20px; display: flex; align-items: center;">
           <div style="width: 100%;">
             <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px;">📍 Endereço que seria entregue</h3>
@@ -327,7 +342,7 @@ export class MailService {
           </div>
         </div>
       `
-            : `
+      : `
         <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 12px; padding: 20px; margin-top: 20px; text-align: center;">
           <img src="https://cdn-icons-png.flaticon.com/512/709/709790.png" width="40" style="opacity: 0.8; margin-bottom: 10px;">
           <h3 style="margin: 0; color: #1565c0;">Era para Retirada</h3>
@@ -335,14 +350,16 @@ export class MailService {
         </div>
       `;
 
-        const reasonHtml = order.motivoCancelamento ? `
+    const reasonHtml = order.motivoCancelamento
+      ? `
             <div style="background-color: #ffebee; border-left: 4px solid #ef5350; border-radius: 4px; padding: 15px; margin: 20px 0; text-align: left;">
                 <p style="margin: 0; color: #c62828; font-weight: bold; font-size: 14px;">Motivo do Cancelamento:</p>
                 <p style="margin: 5px 0 0 0; color: #b71c1c; font-size: 14px;">"${order.motivoCancelamento}"</p>
             </div>
-        ` : '';
+        `
+      : '';
 
-        return `
+    return `
       <!DOCTYPE html>
       <html>
       <head>
@@ -420,82 +437,254 @@ export class MailService {
       </body>
       </html>
     `;
-    }
+  }
 
-    async sendNewOrderEmails(order: Encomendas, adminEmails: string[]) {
-        try {
-            this.logger.log(`Preparando imagens para o pedido #${order.id}...`);
+  private generateStatusUpdateTemplate(
+    order: Encomendas,
+    oldStatus: string,
+    newStatus: string,
+    isClient: boolean,
+    processedImages: {
+      products: Record<number, string>;
+      carts: Record<number, string>;
+    },
+  ): string {
+    const title = isClient
+      ? 'O status do seu pedido mudou! 🚀'
+      : '🔄 Atualização de Status de Pedido';
 
-            const processedImages = {
-                products: {} as Record<number, string>,
-                carts: {} as Record<number, string>
-            };
+    const formatStatus = (s: string) => s.replace(/_/g, ' ');
 
-            const productPromises = order.itens.map(async (item) => {
-                const original = (item.produto as any)?.imagemCapa;
-                if (original) {
-                    const pngUrl = await this.ensurePngUrl(original);
-                    processedImages.products[item.produto.id] = pngUrl;
-                }
-            });
+    const statusBanner = `
+            <div style="background-color: #f0f9ff; border: 1px solid #b9e6fe; border-radius: 12px; padding: 20px; text-align: center; margin: 20px 0;">
+                <p style="color: #666; font-size: 14px; margin: 0 0 10px 0;">O status mudou de:</p>
+                
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                    <span style="background: #e0e0e0; color: #555; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+                        ${formatStatus(oldStatus)}
+                    </span>
+                    <span style="color: #0070f3; font-size: 18px;">➔</span>
+                    <span style="background: #0070f3; color: #fff; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold;">
+                        ${formatStatus(newStatus)}
+                    </span>
+                </div>
+            </div>
+        `;
 
-            const cartPromises = (order.carrinhos || []).map(async (cart) => {
-                const original = this.getCartImageUrl(cart.cor);
-                const pngUrl = await this.ensurePngUrl(original);
-                processedImages.carts[cart.id] = pngUrl;
-            });
+    const productsHtml = order.itens
+      .map((item) => {
+        const imgUrl =
+          processedImages.products[item.produto.id] ||
+          (item.produto as any)?.imagemCapa ||
+          'https://cdn-icons-png.flaticon.com/512/938/938063.png';
+        return `
+                 <tr>
+                    <td width="50" style="padding: 5px 0; border-bottom: 1px solid #eee;">
+                        <img src="${imgUrl}" width="40" style="border-radius: 4px;">
+                    </td>
+                    <td style="padding: 5px 10px; border-bottom: 1px solid #eee; font-size: 13px; color: #333;">
+                        ${item.produto?.nome} <span style="color: #999;">x${item.quantidade}</span>
+                    </td>
+                 </tr>
+            `;
+      })
+      .join('');
 
-            await Promise.all([...productPromises, ...cartPromises]);
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>body { font-family: 'Poppins', sans-serif; margin: 0; padding: 0; background: #f4f4f7; }</style>
+      </head>
+      <body>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f7; padding: 20px 0;">
+          <tr>
+            <td align="center">
+              <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+                <tr>
+                  <td style="background-color: #1a1a2e; padding: 30px 20px; text-align: center;">
+                    <img src="${LOGO_WHITE}" alt="Ice Point" width="150" style="display: block; margin: 0 auto;">
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 40px 30px;">
+                    <h1 style="color: #1a1a2e; font-size: 20px; text-align: center; margin: 0;">${title}</h1>
+                    <p style="text-align: center; color: #7f8c8d; font-size: 14px; margin-top: 5px;">Pedido #${order.id}</p>
+                    
+                    ${statusBanner}
 
-            this.logger.log('Imagens processadas/convertidas para PNG com sucesso.');
+                    <h3 style="color: #1a1a2e; font-size: 16px; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-top: 20px;">📦 Resumo do Pedido</h3>
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                        ${productsHtml}
+                    </table>
+                    
+                     <div style="background-color: #fafafa; border-radius: 12px; padding: 15px; margin-top: 20px; text-align: center;">
+                      <p style="margin: 0; color: #555; font-size: 13px;">
+                        📅 <strong>Data:</strong> ${this.formatDate(order.dataAgendada)} às ${order.horaAgendada}<br>
+                        💰 <strong>Total:</strong> ${this.formatCurrency(Number(order.valorTotal))}
+                      </p>
+                    </div>
 
-            if (order.emailCliente) {
-                await this.resend.emails.send({
-                    from: 'Ice Point <pedidos@icepoint.com.br>',
-                    to: [order.emailCliente],
-                    subject: `Sua festa foi confirmada! Pedido #${order.id} 🍦`,
-                    html: this.generateOrderTemplate(order, true, processedImages),
-                });
-                this.logger.log(`Email enviado para cliente: ${order.emailCliente}`);
-            }
+                    <div style="text-align: center; margin-top: 30px;">
+                      <a href="${LINK_PERFIL}" style="background-color: #0070f3; color: #ffffff; text-decoration: none; padding: 12px 30px; border-radius: 50px; font-weight: bold; font-size: 14px;">
+                        Ver Detalhes
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+        `;
+  }
 
-            if (adminEmails.length > 0) {
-                await this.resend.emails.send({
-                    from: 'Ice Point System <pedidos@icepoint.com.br>',
-                    to: adminEmails,
-                    subject: `[ADMIN] Novo Pedido #${order.id} - ${this.formatCurrency(Number(order.valorTotal))}`,
-                    html: this.generateOrderTemplate(order, false, processedImages),
-                });
-                this.logger.log(`Email enviado para ${adminEmails.length} admins`);
-            }
-        } catch (error) {
-            this.logger.error('Erro ao enviar emails', error);
+  async sendNewOrderEmails(order: Encomendas, adminEmails: string[]) {
+    try {
+      this.logger.log(`Preparando imagens para o pedido #${order.id}...`);
+
+      const processedImages = {
+        products: {} as Record<number, string>,
+        carts: {} as Record<number, string>,
+      };
+
+      const productPromises = order.itens.map(async (item) => {
+        const original = (item.produto as any)?.imagemCapa;
+        if (original) {
+          const pngUrl = await this.ensurePngUrl(original);
+          processedImages.products[item.produto.id] = pngUrl;
         }
+      });
+
+      const cartPromises = (order.carrinhos || []).map(async (cart) => {
+        const original = this.getCartImageUrl(cart.cor);
+        const pngUrl = await this.ensurePngUrl(original);
+        processedImages.carts[cart.id] = pngUrl;
+      });
+
+      await Promise.all([...productPromises, ...cartPromises]);
+
+      this.logger.log('Imagens processadas/convertidas para PNG com sucesso.');
+
+      if (order.emailCliente) {
+        await this.resend.emails.send({
+          from: 'Ice Point <pedidos@icepoint.com.br>',
+          to: [order.emailCliente],
+          subject: `Sua festa foi confirmada! Pedido #${order.id} 🍦`,
+          html: this.generateOrderTemplate(order, true, processedImages),
+        });
+        this.logger.log(`Email enviado para cliente: ${order.emailCliente}`);
+      }
+
+      if (adminEmails.length > 0) {
+        await this.resend.emails.send({
+          from: 'Ice Point System <pedidos@icepoint.com.br>',
+          to: adminEmails,
+          subject: `[ADMIN] Novo Pedido #${order.id} - ${this.formatCurrency(Number(order.valorTotal))}`,
+          html: this.generateOrderTemplate(order, false, processedImages),
+        });
+        this.logger.log(`Email enviado para ${adminEmails.length} admins`);
+      }
+    } catch (error) {
+      this.logger.error('Erro ao enviar emails', error);
     }
+  }
 
-    async sendCancellationEmails(order: Encomendas, adminEmails: string[]) {
-        try {
-            if (order.emailCliente) {
-                await this.resend.emails.send({
-                    from: 'Ice Point <pedidos@icepoint.com.br>',
-                    to: [order.emailCliente],
-                    subject: `Atualização: Pedido #${order.id} Cancelado`,
-                    html: this.generateCancellationTemplate(order, true),
-                });
-                this.logger.log(`Email de cancelamento enviado para cliente: ${order.emailCliente}`);
-            }
+  async sendCancellationEmails(order: Encomendas, adminEmails: string[]) {
+    try {
+      if (order.emailCliente) {
+        await this.resend.emails.send({
+          from: 'Ice Point <pedidos@icepoint.com.br>',
+          to: [order.emailCliente],
+          subject: `Atualização: Pedido #${order.id} Cancelado`,
+          html: this.generateCancellationTemplate(order, true),
+        });
+        this.logger.log(
+          `Email de cancelamento enviado para cliente: ${order.emailCliente}`,
+        );
+      }
 
-            if (adminEmails.length > 0) {
-                await this.resend.emails.send({
-                    from: 'Ice Point System <pedidos@icepoint.com.br>',
-                    to: adminEmails,
-                    subject: `[CANCELADO] Pedido #${order.id} - ${this.formatCurrency(Number(order.valorTotal))}`,
-                    html: this.generateCancellationTemplate(order, false),
-                });
-                this.logger.log(`Email de cancelamento enviado para ${adminEmails.length} admins`);
-            }
-        } catch (error) {
-            this.logger.error('Erro ao enviar emails de cancelamento', error);
+      if (adminEmails.length > 0) {
+        await this.resend.emails.send({
+          from: 'Ice Point System <pedidos@icepoint.com.br>',
+          to: adminEmails,
+          subject: `[CANCELADO] Pedido #${order.id} - ${this.formatCurrency(Number(order.valorTotal))}`,
+          html: this.generateCancellationTemplate(order, false),
+        });
+        this.logger.log(
+          `Email de cancelamento enviado para ${adminEmails.length} admins`,
+        );
+      }
+    } catch (error) {
+      this.logger.error('Erro ao enviar emails de cancelamento', error);
+    }
+  }
+
+  async sendStatusUpdateEmails(
+    order: Encomendas,
+    oldStatus: string,
+    newStatus: string,
+    adminEmails: string[],
+  ) {
+    try {
+      this.logger.log(
+        `Preparando imagens para update de status do pedido #${order.id}...`,
+      );
+
+      const processedImages = {
+        products: {} as Record<number, string>,
+        carts: {} as Record<number, string>,
+      };
+
+      const productPromises = order.itens.map(async (item) => {
+        const original = (item.produto as any)?.imagemCapa;
+        if (original) {
+          processedImages.products[item.produto.id] =
+            await this.ensurePngUrl(original);
         }
+      });
+      await Promise.all(productPromises);
+
+      if (order.emailCliente) {
+        await this.resend.emails.send({
+          from: 'Ice Point <pedidos@icepoint.com.br>',
+          to: [order.emailCliente],
+          subject: `Atualização: Pedido #${order.id} mudou para ${newStatus.replace(/_/g, ' ')}`,
+          html: this.generateStatusUpdateTemplate(
+            order,
+            oldStatus,
+            newStatus,
+            true,
+            processedImages,
+          ),
+        });
+        this.logger.log(
+          `Email de status enviado para cliente: ${order.emailCliente}`,
+        );
+      }
+
+      if (adminEmails.length > 0) {
+        await this.resend.emails.send({
+          from: 'Ice Point System <pedidos@icepoint.com.br>',
+          to: adminEmails,
+          subject: `[STATUS] Pedido #${order.id} -> ${newStatus}`,
+          html: this.generateStatusUpdateTemplate(
+            order,
+            oldStatus,
+            newStatus,
+            false,
+            processedImages,
+          ),
+        });
+      }
+    } catch (error) {
+      this.logger.error(
+        'Erro ao enviar emails de atualização de status',
+        error,
+      );
     }
+  }
 }

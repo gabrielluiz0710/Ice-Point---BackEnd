@@ -13,10 +13,13 @@ import { CartService } from './cart.service';
 import { CartTransferDto } from './dto/cart-transfer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CheckoutDto } from './dto/checkout.dto';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { AdminCreateOrderDto } from './dto/admin-create-order.dto';
 
 @Controller('cart')
 export class CartController {
-  constructor(private readonly cartService: CartService) {}
+  constructor(private readonly cartService: CartService) { }
 
   @UseGuards(JwtAuthGuard)
   @Post('transfer')
@@ -59,5 +62,12 @@ export class CartController {
       checkoutDto.userId,
       checkoutDto,
     );
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'FUNCIONARIO')
+  @Post('admin/criar')
+  async createOrderByAdmin(@Body() createDto: AdminCreateOrderDto) {
+    return await this.cartService.createOrderByAdmin(createDto);
   }
 }

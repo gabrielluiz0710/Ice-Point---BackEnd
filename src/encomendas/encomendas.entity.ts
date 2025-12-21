@@ -21,7 +21,7 @@ export class Encomendas {
   id: number;
 
   @Column({ type: 'uuid', name: 'cliente_id', nullable: true })
-  clienteId: string;
+  clienteId: string | null;
 
   @Column({ name: 'nome_cliente', nullable: true })
   nomeCliente: string;

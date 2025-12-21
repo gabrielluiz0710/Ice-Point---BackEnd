@@ -16,6 +16,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CancelarEncomendaDto } from './dto/cancelar-encomenda.dto';
 import { RolesGuard } from '../auth/roles.guard'; 
 import { Roles } from '../auth/roles.decorator';
+import { UpdateEncomendaStatusDto } from './dto/update-encomenda-status.dto';
+import { UpdatePagamentoStatusDto } from './dto/update-pagamento-status.dto';
 
 @Controller('encomendas')
 export class EncomendasController {
@@ -61,5 +63,29 @@ export class EncomendasController {
   ) {
     const userId = req.user.userId;
     return await this.encomendasService.cancelOrder(id, userId, cancelDto.motivo);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'FUNCIONARIO')
+  @Patch(':id/status')
+  async updateStatus(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdateEncomendaStatusDto
+  ) {
+    const userId = req.user.userId;
+    return await this.encomendasService.updateStatus(id, userId, updateDto);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'FUNCIONARIO')
+  @Patch(':id/pagamento')
+  async updatePaymentStatus(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateDto: UpdatePagamentoStatusDto
+  ) {
+    const userId = req.user.userId;
+    return await this.encomendasService.updatePaymentStatus(id, userId, updateDto);
   }
 }

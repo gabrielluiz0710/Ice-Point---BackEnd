@@ -11,6 +11,8 @@ import { Usuarios } from '../users/usuarios.entity';
 import { EncomendaStatus } from './encomenda.enums';
 import { MailService } from '../mail/mail.service';
 import { CalendarService } from '../calendar/calendar.service';
+import { UpdateEncomendaStatusDto } from './dto/update-encomenda-status.dto';
+import { UpdatePagamentoStatusDto } from './dto/update-pagamento-status.dto';
 
 export interface PedidoResumido {
   id: number;
@@ -216,5 +218,72 @@ export class EncomendasService {
       total: encomendas.length,
       data: encomendas
     };
+  }
+
+  async updateStatus(orderId: number, userId: string, updateDto: UpdateEncomendaStatusDto) {
+    const usuario = await this.usuarioRepository.findOne({ where: { id: userId } });
+    if (!usuario) throw new NotFoundException('Usuário inválido.');
+
+    if (usuario.tipo !== 'ADMIN' && usuario.tipo !== 'FUNCIONARIO') {
+        throw new ForbiddenException('Permissão negada.');
+    }
+
+    const order = await this.encomendaRepository.findOne({
+      where: { id: orderId },
+      relations: ['itens', 'itens.produto'],
+    });
+
+    if (!order) {
+      throw new NotFoundException('Pedido não encontrado.');
+    }
+
+    const oldStatus = order.status;
+    const newStatus = updateDto.status;
+
+    if (oldStatus === newStatus) {
+        return order;
+    }
+
+    order.status = newStatus;
+
+    const savedOrder = await this.encomendaRepository.save(order);
+
+    try {
+      const admins = await this.usuarioRepository.find({
+        where: { tipo: 'ADMIN' },
+        select: ['email'],
+      });
+      const adminEmails = admins.map((u) => u.email).filter((e) => !!e);
+
+      this.mailService.sendStatusUpdateEmails(savedOrder, oldStatus, newStatus, adminEmails);
+    } catch (error) {
+      console.error('Erro ao enviar notificação de status:', error);
+    }
+
+    return savedOrder;
+  }
+
+  async updatePaymentStatus(orderId: number, userId: string, updateDto: UpdatePagamentoStatusDto) {
+    const usuario = await this.usuarioRepository.findOne({ where: { id: userId } });
+    if (!usuario) throw new NotFoundException('Usuário inválido.');
+
+    if (usuario.tipo !== 'ADMIN' && usuario.tipo !== 'FUNCIONARIO') {
+        throw new ForbiddenException('Permissão negada.');
+    }
+
+    const order = await this.encomendaRepository.findOne({ where: { id: orderId } });
+
+    if (!order) {
+      throw new NotFoundException('Pedido não encontrado.');
+    }
+
+    order.statusPagamento = updateDto.status;
+    if (updateDto.status === 'PAGO') {
+        if (order.status === EncomendaStatus.PENDENTE || order.status === EncomendaStatus.AGUARDANDO_PAGAMENTO) {
+            order.status = EncomendaStatus.CONFIRMADO;
+        }
+    }
+
+    return await this.encomendaRepository.save(order);
   }
 }
