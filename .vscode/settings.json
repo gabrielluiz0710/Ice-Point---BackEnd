@@ -16,5 +16,6 @@
 
   // Garante que a formatação ao salvar antiga esteja desativada
   // para não conflitar com o "codeActionsOnSave".
-  "editor.formatOnSave": false
+  "editor.formatOnSave": false,
+  "extension.prophet.sitecontext.selectedSiteID": ""
 }

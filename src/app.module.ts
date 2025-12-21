@@ -11,6 +11,7 @@ import { GoogleReviewsModule } from './google-reviews/google-reviews.module';
 import { PaymentModule } from './payment/payment.module';
 import { EncomendasModule } from './encomendas/encomendas.module';
 import { ShippingModule } from './shipping/shipping.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -48,7 +49,8 @@ import { ShippingModule } from './shipping/shipping.module';
     GoogleReviewsModule,
     PaymentModule,
     EncomendasModule,
-    ShippingModule
+    ShippingModule,
+    DashboardModule
   ],
   controllers: [],
   providers: [],
