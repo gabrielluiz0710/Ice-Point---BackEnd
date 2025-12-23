@@ -7,60 +7,78 @@ import { ConfigService } from '@nestjs/config';
 export class ShippingService {
   private readonly logger = new Logger(ShippingService.name);
   
-  private readonly DESTINATION = 'Av. Padre Eddie Bernardes da Silva, 965 - Lourdes, Uberaba - MG, 38035-230';
+  private readonly STORE_ORIGIN = 'Av. Padre Eddie Bernardes da Silva, 965, Lourdes, Uberaba - MG, 38035-230';
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {}
 
-  async calculateShippingFee(addressData: { street: string; number: string; city: string; state: string; cep: string }) {
+  async calculateShippingFee(addressData: { street: string; number: string; city: string; state: string; cep: string; neighborhood?: string }) {
     const apiKey = this.configService.get<string>('GOOGLE_MAPS_SHIPPING_API_KEY');
     
     if (!apiKey) {
       this.logger.error('GOOGLE_MAPS_SHIPPING_API_KEY não configurada');
-      throw new BadRequestException('Erro interno de configuração de API');
+      throw new BadRequestException('Erro de configuração no servidor.');
     }
 
-    const fullOrigin = `${addressData.street}, ${addressData.number}, ${addressData.city} - ${addressData.state}`;
-    
-    let distanceInMeters = await this.getDistance(fullOrigin, apiKey);
+    const destinationString = [
+      `${addressData.street}, ${addressData.number}`,
+      addressData.neighborhood ? addressData.neighborhood : '',
+      `${addressData.city} - ${addressData.state}`,
+      `CEP ${addressData.cep}`,
+      'Brasil'
+    ].filter(Boolean).join(', ');
+
+    this.logger.log(`Calculando frete de: [${this.STORE_ORIGIN}] para [${destinationString}]`);
+
+    const distanceInMeters = await this.getDistanceMatrix(this.STORE_ORIGIN, destinationString, apiKey);
 
     if (distanceInMeters === null) {
-      this.logger.warn(`Não foi possível calcular pelo endereço "${fullOrigin}". Tentando pelo CEP...`);
-      const cepOrigin = addressData.cep;
-      distanceInMeters = await this.getDistance(cepOrigin, apiKey);
+        throw new BadRequestException('Endereço não localizado com precisão. Verifique o número e o CEP.');
     }
 
-    if (distanceInMeters === null) {
-        throw new BadRequestException('Não foi possível calcular a distância para este endereço. Verifique os dados.');
-    }
+    const distanceInKm = distanceInMeters / 1000;
 
-    const price = distanceInMeters >= 9000 ? 30 : 20;
+    const price = this.calculatePriceLogic(distanceInKm);
 
     return {
-      distance: (distanceInMeters / 1000).toFixed(1) + ' km',
-      fee: price
+      distance: distanceInKm.toFixed(2) + ' km',
+      fee: price,
+      debug_address: destinationString 
     };
   }
 
-  private async getDistance(origin: string, apiKey: string): Promise<number | null> {
-    const encodedOrigin = encodeURIComponent(origin);
-    const encodedDestination = encodeURIComponent(this.DESTINATION);
+  private calculatePriceLogic(km: number): number {
+    if (km < 10) return 20;
+    return 30;
 
-    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodedOrigin}&destinations=${encodedDestination}&key=${apiKey}&language=pt-BR`;
+    /* Cálculo por KM (Exemplo)
+    const taxaBase = 10;
+    const precoPorKm = 2;
+    return taxaBase + (km * precoPorKm);
+    */
+  }
+
+  private async getDistanceMatrix(origin: string, destination: string, apiKey: string): Promise<number | null> {
+    const encodedOrigin = encodeURIComponent(origin);
+    const encodedDestination = encodeURIComponent(destination);
+
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${encodedOrigin}&destinations=${encodedDestination}&mode=driving&key=${apiKey}&language=pt-BR`;
 
     try {
       const { data } = await firstValueFrom(this.httpService.get(url));
 
       if (data.status !== 'OK') {
-        this.logger.error(`Erro na API Google: ${data.status}`);
+        this.logger.error(`Google API Error: ${data.status} - ${data.error_message}`);
         return null;
       }
 
-      const element = data.rows[0].elements[0];
+      const row = data.rows[0];
+      const element = row.elements[0];
 
       if (element.status !== 'OK') {
+        this.logger.warn(`Element status error: ${element.status} (Provavelmente endereço não encontrado)`);
         return null;
       }
 

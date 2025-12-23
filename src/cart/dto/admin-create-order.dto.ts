@@ -79,4 +79,12 @@ export class AdminCreateOrderDto {
   @IsArray()
   @IsOptional()
   cartIds?: number[];
+
+  @IsOptional()
+  @IsNumber()
+  taxaEntrega?: number;
+
+  @IsOptional()
+  @IsNumber()
+  valorDesconto?: number;
 }

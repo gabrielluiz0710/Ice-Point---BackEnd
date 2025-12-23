@@ -363,7 +363,6 @@ export class CartService {
         metodoEntrega: dto.metodoEntrega,
         metodoPagamento: dto.metodoPagamento,
         
-        // Endereço
         enderecoCep: dto.enderecoCep,
         enderecoLogradouro: dto.enderecoLogradouro,
         enderecoNumero: dto.enderecoNumero,
@@ -371,12 +370,10 @@ export class CartService {
         enderecoCidade: dto.enderecoCidade,
         enderecoEstado: dto.enderecoEstado,
 
-        // Status inicial já confirmado (admin lançando)
         status: EncomendaStatus.CONFIRMADO, 
         itens: []
       });
 
-      // 3. Vincular Carrinhos Físicos (se houver)
       if (dto.cartIds && dto.cartIds.length > 0) {
         const carrinhos = await manager.findBy(Carrinho, { id: In(dto.cartIds) });
         if (carrinhos.length !== dto.cartIds.length) {
@@ -385,14 +382,11 @@ export class CartService {
         newOrder.carrinhos = carrinhos;
       }
 
-      // Salva a encomenda inicial para gerar o ID
       const savedOrder = await manager.save(newOrder);
 
-      // 4. Processar Itens
       let somaProdutos = 0;
       const itensParaSalvar: EncomendaItens[] = [];
 
-      // Agrupa itens repetidos
       const itemsMap = new Map<number, number>();
       dto.items.forEach((item) => {
         if (item.quantity > 0) {
@@ -422,19 +416,8 @@ export class CartService {
         await manager.save(itensParaSalvar);
       }
 
-      // 5. Calcular Totais (Frete e Desconto)
-      let taxaEntrega = 0;
-      if (savedOrder.metodoEntrega === MetodoEntrega.DELIVERY) {
-        taxaEntrega = 20.00; // Regra fixa, ou pode vir do DTO se quiser flexibilizar no futuro
-      }
-
-      let valorDesconto = 0;
-      if (
-        savedOrder.metodoPagamento === MetodoPagamento.PIX ||
-        savedOrder.metodoPagamento === MetodoPagamento.CASH
-      ) {
-        valorDesconto = somaProdutos * 0.10; // 10% desconto
-      }
+      const taxaEntrega = Number(dto.taxaEntrega) || 0;
+      const valorDesconto = Number(dto.valorDesconto) || 0;
 
       const valorTotalFinal = somaProdutos + taxaEntrega - valorDesconto;
 
