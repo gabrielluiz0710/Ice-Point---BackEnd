@@ -342,7 +342,7 @@ export class CartService {
     });
   }
 
-  async createOrderByAdmin(dto: AdminCreateOrderDto) {
+  async createOrderByAdmin(dto: AdminCreateOrderDto, adminId: string) {
     return await this.dataSource.transaction(async (manager) => {
       const usuario = await manager.findOne(Usuarios, { 
         where: { email: dto.email } 
@@ -371,7 +371,8 @@ export class CartService {
         enderecoEstado: dto.enderecoEstado,
 
         status: EncomendaStatus.CONFIRMADO, 
-        itens: []
+        itens: [],
+        cadastradoPorId: adminId
       });
 
       if (dto.cartIds && dto.cartIds.length > 0) {

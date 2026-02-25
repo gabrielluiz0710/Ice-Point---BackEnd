@@ -67,7 +67,8 @@ export class CartController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'FUNCIONARIO')
   @Post('admin/criar')
-  async createOrderByAdmin(@Body() createDto: AdminCreateOrderDto) {
-    return await this.cartService.createOrderByAdmin(createDto);
+  async createOrderByAdmin(@Request() req, @Body() createDto: AdminCreateOrderDto) {
+    const adminId = req.user.userId;
+    return await this.cartService.createOrderByAdmin(createDto, adminId);
   }
 }

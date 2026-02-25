@@ -146,6 +146,9 @@ export class Encomendas {
   @Column({ name: 'google_event_id', nullable: true })
   googleEventId: string;
 
+  @Column({ type: 'uuid', name: 'cadastrado_por_id', nullable: true })
+  cadastradoPorId: string | null;
+
   @OneToMany(() => EncomendaItens, (item) => item.encomenda, { cascade: true })
   itens: EncomendaItens[];
 

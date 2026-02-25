@@ -120,7 +120,25 @@ export class EncomendasService {
       throw new NotFoundException('Pedido não encontrado.');
     }
 
-    return order;
+    let cadastradoPor: any = null;
+    if (order.cadastradoPorId) {
+       const adminUser = await this.usuarioRepository.findOne({
+           where: { id: order.cadastradoPorId },
+           select: ['nome', 'email', 'tipo']
+       });
+       if (adminUser) {
+           cadastradoPor = {
+               nome: adminUser.nome,
+               email: adminUser.email,
+               tipo: adminUser.tipo
+           };
+       }
+    }
+
+    return {
+        ...order,
+        cadastradoPor
+    };
   }
 
   async cancelOrder(orderId: number, userId: string, motivo: string) {
