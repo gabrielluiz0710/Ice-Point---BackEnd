@@ -12,6 +12,7 @@ import { PaymentModule } from './payment/payment.module';
 import { EncomendasModule } from './encomendas/encomendas.module';
 import { ShippingModule } from './shipping/shipping.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -50,7 +51,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     PaymentModule,
     EncomendasModule,
     ShippingModule,
-    DashboardModule
+    DashboardModule,
+    WhatsappModule
   ],
   controllers: [],
   providers: [],
