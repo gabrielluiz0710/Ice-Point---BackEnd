@@ -1,65 +1,92 @@
 import { Injectable } from '@nestjs/common';
 import { EvolutionService } from '../evolution.service';
 import { SessionService } from '../session.service';
+import { CardapioHandler } from './cardapio.handler';
+import { InfoHandler } from './info.handler';
+import { EncomendaHandler } from './encomenda.handler';
 
 @Injectable()
 export class MenuHandler {
   constructor(
     private readonly evo: EvolutionService,
     private readonly session: SessionService,
+    private readonly cardapioHandler: CardapioHandler,
+    private readonly infoHandler: InfoHandler,
+    private readonly encomendaHandler: EncomendaHandler,
   ) {}
 
   async handle(ctx: any): Promise<void> {
     const { remoteJid, telefone, nomeContato, texto } = ctx;
 
-    const saudacoes = ['oi', 'olá', 'ola', 'ola!', 'oi!', 'bom dia', 'boa tarde', 'boa noite', 'inicio', 'comecar', 'começar', '0'];
+    const saudacoes = [
+      'oi',
+      'olá',
+      'ola',
+      'oi!',
+      'bom dia',
+      'boa tarde',
+      'boa noite',
+      'inicio',
+      'comecar',
+      'começar',
+      'hey',
+      'hello',
+    ];
 
-    if (saudacoes.some(s => texto.includes(s)) || ctx.session.estado === 'INICIO') {
-      await this.session.update(telefone, 'MENU_PRINCIPAL');
-      await this.evo.sendText(remoteJid,
-        `Olá, ${nomeContato}! 👋🍦\n\nBem-vindo à *Ice Point*!\n\nEscolha uma opção:\n\n*1* - 🛒 Ver carrinhos de picolé\n*2* - 📋 Fazer encomenda\n*3* - 📞 Falar com atendente\n\n_Digite o número da opção desejada_`
-      );
+    if (
+      saudacoes.some((s) => texto.includes(s)) ||
+      ctx.session.estado === 'INICIO'
+    ) {
+      await this.enviarMenu(remoteJid, telefone, nomeContato);
       return;
     }
 
     switch (texto) {
       case '1':
-        await this.session.update(telefone, 'VER_PRODUTOS');
-        // Handler de encomenda também trata VER_PRODUTOS
+        await this.cardapioHandler.enviarCardapio(ctx);
         break;
+
       case '2':
-        await this.session.update(telefone, 'INICIANDO_ENCOMENDA');
+        await this.encomendaHandler.iniciarEncomenda(ctx);
         break;
+
       case '3':
-        await this.evo.sendText(remoteJid,
-          '📞 Tudo bem! Um atendente vai te responder em breve.\n\nSe quiser voltar ao menu automático, digite *menu*.'
+        await this.infoHandler.enviarInfo(ctx);
+        break;
+
+      case '4':
+        await this.session.setHumanMode(telefone, true);
+        await this.evo.sendText(
+          remoteJid,
+          '👤 Certo! Um atendente vai te responder em breve.\n\n' +
+            '_Quando o atendimento for encerrado, o menu automático voltará a funcionar._',
         );
-        return;
+        break;
+
       default:
-        await this.evo.sendText(remoteJid,
-          'Não entendi 😅 Digite *1*, *2* ou *3* para escolher uma opção, ou *oi* para ver o menu novamente.'
+        await this.evo.sendText(
+          remoteJid,
+          'Não entendi 😅\n\nDigite *1*, *2*, *3* ou *4* para escolher uma opção, ou *oi* para ver o menu novamente.',
         );
-        return;
     }
-
-    // Após atualizar estado, processa imediatamente no handler correto
-    // (o whatsapp.service vai reprocessar na próxima mensagem,
-    // mas aqui disparamos já o próximo passo)
-    if (texto === '1') await this.mostrarProdutos(remoteJid, telefone);
-    if (texto === '2') await this.iniciarEncomenda(remoteJid, telefone, nomeContato);
   }
 
-  private async mostrarProdutos(remoteJid: string, telefone: string): Promise<void> {
-    // Busca produtos do Supabase aqui ou injeta ProdutosService
-    await this.evo.sendText(remoteJid,
-      '🛒 *Nossos Carrinhos de Picolé*\n\nCarregando cardápio...'
-    );
-  }
-
-  private async iniciarEncomenda(remoteJid: string, telefone: string, nome: string): Promise<void> {
-    await this.session.update(telefone, 'AGUARDANDO_NOME', {});
-    await this.evo.sendText(remoteJid,
-      '📋 *Nova Encomenda*\n\nVamos começar! Primeiro, qual é o seu nome completo?'
+  async enviarMenu(
+    remoteJid: string,
+    telefone: string,
+    nomeContato: string,
+  ): Promise<void> {
+    await this.session.update(telefone, 'MENU_PRINCIPAL');
+    await this.evo.sendText(
+      remoteJid,
+      `Olá, ${nomeContato}! 👋🍦\n\n` +
+        `Bem-vindo à *Ice Point*!\n\n` +
+        `Escolha uma opção:\n\n` +
+        `*1* - 📋 Ver cardápio\n` +
+        `*2* - 🛒 Fazer encomenda de carrinho de picolé para festa\n` +
+        `*3* - ℹ️ Informações sobre a sorveteria\n` +
+        `*4* - 👤 Falar com atendente\n\n` +
+        `_Digite o número da opção desejada_`,
     );
   }
 }

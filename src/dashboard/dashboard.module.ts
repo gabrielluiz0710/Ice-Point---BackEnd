@@ -6,9 +6,7 @@ import { Encomendas } from '../encomendas/encomendas.entity';
 import { EncomendaItens } from '../encomendas/encomenda-itens.entity';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Encomendas, EncomendaItens]), 
-  ],
+  imports: [TypeOrmModule.forFeature([Encomendas, EncomendaItens])],
   controllers: [DashboardController],
   providers: [DashboardService],
 })

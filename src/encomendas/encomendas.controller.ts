@@ -1,10 +1,10 @@
-import { 
-  Controller, 
-  Get, 
-  Param, 
-  UseGuards, 
-  Request, 
-  ForbiddenException, 
+import {
+  Controller,
+  Get,
+  Param,
+  UseGuards,
+  Request,
+  ForbiddenException,
   NotFoundException,
   ParseIntPipe,
   Patch,
@@ -14,7 +14,7 @@ import {
 import { EncomendasService } from './encomendas.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CancelarEncomendaDto } from './dto/cancelar-encomenda.dto';
-import { RolesGuard } from '../auth/roles.guard'; 
+import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { UpdateEncomendaStatusDto } from './dto/update-encomenda-status.dto';
 import { UpdatePagamentoStatusDto } from './dto/update-pagamento-status.dto';
@@ -24,11 +24,9 @@ export class EncomendasController {
   constructor(private readonly encomendasService: EncomendasService) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'FUNCIONARIO') 
+  @Roles('ADMIN', 'FUNCIONARIO')
   @Get('ativas')
-  async findActiveOrders(
-    @Query('startDate') startDate: string
-  ) {
+  async findActiveOrders(@Query('startDate') startDate: string) {
     const date = startDate || new Date().toISOString().split('T')[0];
     return await this.encomendasService.findActiveOrdersByWeek(date);
   }
@@ -57,12 +55,16 @@ export class EncomendasController {
   @UseGuards(JwtAuthGuard)
   @Patch(':id/cancelar')
   async cancelOrder(
-    @Request() req, 
-    @Param('id', ParseIntPipe) id: number, 
-    @Body() cancelDto: CancelarEncomendaDto
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() cancelDto: CancelarEncomendaDto,
   ) {
     const userId = req.user.userId;
-    return await this.encomendasService.cancelOrder(id, userId, cancelDto.motivo);
+    return await this.encomendasService.cancelOrder(
+      id,
+      userId,
+      cancelDto.motivo,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -71,7 +73,7 @@ export class EncomendasController {
   async updateStatus(
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateDto: UpdateEncomendaStatusDto
+    @Body() updateDto: UpdateEncomendaStatusDto,
   ) {
     const userId = req.user.userId;
     return await this.encomendasService.updateStatus(id, userId, updateDto);
@@ -83,9 +85,13 @@ export class EncomendasController {
   async updatePaymentStatus(
     @Request() req,
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateDto: UpdatePagamentoStatusDto
+    @Body() updateDto: UpdatePagamentoStatusDto,
   ) {
     const userId = req.user.userId;
-    return await this.encomendasService.updatePaymentStatus(id, userId, updateDto);
+    return await this.encomendasService.updatePaymentStatus(
+      id,
+      userId,
+      updateDto,
+    );
   }
 }

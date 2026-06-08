@@ -24,14 +24,23 @@ export class SessionService {
 
     const { data: nova } = await this.supabase
       .from('bot_sessoes')
-      .insert({ telefone, estado: 'INICIO', dados_temp: {} })
+      .insert({
+        telefone,
+        estado: 'INICIO',
+        dados_temp: {},
+        atendimento_humano: false,
+      })
       .select()
       .single();
 
     return nova;
   }
 
-  async update(telefone: string, estado: string, dados_temp?: object): Promise<void> {
+  async update(
+    telefone: string,
+    estado: string,
+    dados_temp?: object,
+  ): Promise<void> {
     const update: any = { estado, ultima_interacao: new Date().toISOString() };
     if (dados_temp !== undefined) update.dados_temp = dados_temp;
 
@@ -42,6 +51,41 @@ export class SessionService {
   }
 
   async reset(telefone: string): Promise<void> {
-    await this.update(telefone, 'INICIO', {});
+    await this.supabase
+      .from('bot_sessoes')
+      .update({
+        estado: 'INICIO',
+        dados_temp: {},
+        atendimento_humano: false,
+        ultima_interacao: new Date().toISOString(),
+      })
+      .eq('telefone', telefone);
+  }
+
+  async setHumanMode(telefone: string, active: boolean): Promise<void> {
+    const update: any = {
+      atendimento_humano: active,
+      ultima_interacao: new Date().toISOString(),
+    };
+    if (active) {
+      update.estado = 'ATENDIMENTO_HUMANO';
+    }
+
+    await this.supabase
+      .from('bot_sessoes')
+      .update(update)
+      .eq('telefone', telefone);
+  }
+
+  async releaseHumanMode(telefone: string): Promise<void> {
+    await this.supabase
+      .from('bot_sessoes')
+      .update({
+        atendimento_humano: false,
+        estado: 'INICIO',
+        dados_temp: {},
+        ultima_interacao: new Date().toISOString(),
+      })
+      .eq('telefone', telefone);
   }
 }

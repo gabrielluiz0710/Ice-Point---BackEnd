@@ -3,17 +3,17 @@ export interface WebhookPayload {
   instance: string;
   data: {
     key: {
-      remoteJid: string;   
+      remoteJid: string;
       fromMe: boolean;
       id: string;
     };
     message: {
-      conversation?: string;       
+      conversation?: string;
       extendedTextMessage?: {
         text: string;
       };
     };
     messageType: string;
-    pushName: string;               
+    pushName: string;
   };
 }

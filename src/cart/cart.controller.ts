@@ -19,7 +19,7 @@ import { AdminCreateOrderDto } from './dto/admin-create-order.dto';
 
 @Controller('cart')
 export class CartController {
-  constructor(private readonly cartService: CartService) { }
+  constructor(private readonly cartService: CartService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post('transfer')
@@ -67,7 +67,10 @@ export class CartController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'FUNCIONARIO')
   @Post('admin/criar')
-  async createOrderByAdmin(@Request() req, @Body() createDto: AdminCreateOrderDto) {
+  async createOrderByAdmin(
+    @Request() req,
+    @Body() createDto: AdminCreateOrderDto,
+  ) {
     const adminId = req.user.userId;
     return await this.cartService.createOrderByAdmin(createDto, adminId);
   }

@@ -8,9 +8,7 @@ import { MailService } from '../mail/mail.service';
 import { CalendarService } from '../calendar/calendar.service';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Encomendas, Usuarios]),
-  ],
+  imports: [TypeOrmModule.forFeature([Encomendas, Usuarios])],
   controllers: [EncomendasController],
   providers: [EncomendasService, MailService, CalendarService],
   exports: [EncomendasService],

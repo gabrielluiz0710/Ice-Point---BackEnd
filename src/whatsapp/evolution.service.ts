@@ -11,61 +11,15 @@ export class EvolutionService {
 
   constructor(private readonly http: HttpService) {}
 
-  private normalizarJid(jid: string): string {
-    if (jid.includes('@s.whatsapp.net')) return jid;
-
-    if (jid.includes('@lid')) {
-      this.logger.warn(`JID no formato LID recebido: ${jid} - pode falhar`);
-      return jid;
-    }
-
-    return `${jid}@s.whatsapp.net`;
-  }
-
-  private async resolverJid(jid: string): Promise<string> {
-    // Formato normal, retorna direto
-    if (jid.includes('@s.whatsapp.net')) return jid;
-
-    // Formato LID — busca o número real
-    if (jid.includes('@lid')) {
-      try {
-        const numero = jid.replace('@lid', '');
-        const response = await firstValueFrom(
-          this.http.post(
-            `${this.baseUrl}/chat/whatsappNumbers/${this.instance}`,
-            { numbers: [numero] },
-            { headers: { apikey: this.apiKey } },
-          ),
-        );
-
-        const resultado = response.data?.[0];
-        if (resultado?.exists && resultado?.jid) {
-          this.logger.log(`LID resolvido: ${jid} → ${resultado.jid}`);
-          return resultado.jid;
-        }
-      } catch (err) {
-        this.logger.warn(`Não conseguiu resolver LID ${jid}: ${err.message}`);
-      }
-
-      // Fallback: tenta enviar direto mesmo assim
-      return jid;
-    }
-
-    return `${jid}@s.whatsapp.net`;
+  private resolveNumber(to: string): string {
+    if (to.includes('@lid')) return to;
+    if (to.includes('@s.whatsapp.net'))
+      return to.replace('@s.whatsapp.net', '');
+    return to;
   }
 
   async sendText(to: string, text: string): Promise<void> {
-    let number: string;
-
-    if (to.includes('@lid')) {
-      // Manda JID @lid completo — Evolution recente suporta
-      number = to;
-    } else if (to.includes('@s.whatsapp.net')) {
-      // Remove sufixo, Evolution monta o JID internamente
-      number = to.replace('@s.whatsapp.net', '');
-    } else {
-      number = to;
-    }
+    const number = this.resolveNumber(to);
 
     try {
       await firstValueFrom(
@@ -80,7 +34,36 @@ export class EvolutionService {
       this.logger.error(
         `Erro ao enviar para ${number}: ${JSON.stringify(err?.response?.data)}`,
       );
-      throw err; // re-lança para quem chamou poder tratar
+      throw err;
+    }
+  }
+
+  async sendImage(
+    to: string,
+    imageUrl: string,
+    caption?: string,
+  ): Promise<void> {
+    const number = this.resolveNumber(to);
+
+    try {
+      await firstValueFrom(
+        this.http.post(
+          `${this.baseUrl}/message/sendMedia/${this.instance}`,
+          {
+            number,
+            mediatype: 'image',
+            mimetype: 'image/webp',
+            caption: caption || '',
+            media: imageUrl,
+          },
+          { headers: { apikey: this.apiKey } },
+        ),
+      );
+      this.logger.log(`Imagem enviada para ${number}`);
+    } catch (err) {
+      this.logger.error(
+        `Erro ao enviar imagem para ${number}: ${JSON.stringify(err?.response?.data)}`,
+      );
     }
   }
 

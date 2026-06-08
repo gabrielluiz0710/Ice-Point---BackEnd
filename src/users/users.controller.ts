@@ -85,8 +85,12 @@ export class UsersController {
   @Roles('ADMIN')
   @Post()
   async createUser(@Request() req, @Body() body: any) {
-    let origin = req.headers.origin || req.headers.referer || process.env.FRONTEND_URL || 'https://icepoint.com.br';
-    
+    let origin =
+      req.headers.origin ||
+      req.headers.referer ||
+      process.env.FRONTEND_URL ||
+      'https://icepoint.com.br';
+
     if (origin.endsWith('/')) {
       origin = origin.slice(0, -1);
     }
@@ -117,7 +121,7 @@ export class UsersController {
       new ParseFilePipe({
         validators: [
           new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }), 
+          new FileTypeValidator({ fileType: /(jpg|jpeg|png)$/ }),
         ],
       }),
     )

@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Product } from './product.entity';
 
 @Entity('produto_imagens')
@@ -18,7 +24,9 @@ export class ProductImage {
   @Column({ default: 0 })
   ordem: number;
 
-  @ManyToOne(() => Product, (product) => product.imagens, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Product, (product) => product.imagens, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'produto_id' })
   produto: Product;
 }
