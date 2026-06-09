@@ -90,7 +90,14 @@ export class CartService {
         const produto = await manager.findOne(Product, {
           where: { id: itemDto.productId },
         });
-        const preco = produto ? Number(produto.preco_unitario) : 0;
+
+        if (!produto) {
+          throw new BadRequestException(
+            `Produto com ID ${itemDto.productId} não encontrado.`,
+          );
+        }
+
+        const preco = Number(produto.preco_unitario);
 
         const novoItem = manager.create(EncomendaItens, {
           encomenda: { id: activeCart.id },
@@ -206,6 +213,52 @@ export class CartService {
         });
       }
 
+      // D+1: data agendada deve ser no mínimo o dia seguinte (UTC)
+      const dataAgendadaIso = this.toIsoDate(dto.dataAgendada);
+      if (!dataAgendadaIso) {
+        throw new BadRequestException('Data agendada inválida.');
+      }
+      const hoje = new Date();
+      hoje.setUTCHours(0, 0, 0, 0);
+      const amanha = new Date(hoje);
+      amanha.setUTCDate(hoje.getUTCDate() + 1);
+      const dataAgendadaDate = new Date(dataAgendadaIso + 'T00:00:00Z');
+      if (dataAgendadaDate < amanha) {
+        throw new BadRequestException(
+          'O agendamento deve ser para no mínimo o dia seguinte (D+1).',
+        );
+      }
+
+      // Validação de maioridade (18 anos)
+      const birthDateRaw =
+        dto.personalData?.birthDate || usuario?.data_nascimento;
+
+      if (!birthDateRaw) {
+        throw new BadRequestException(
+          'Data de nascimento é obrigatória para realizar um pedido.',
+        );
+      }
+
+      const isoBirthDate = this.toIsoDate(birthDateRaw);
+      const nascimento = new Date(isoBirthDate + 'T00:00:00Z');
+      const idadeAnos =
+        (Date.now() - nascimento.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+      if (idadeAnos < 18) {
+        throw new BadRequestException(
+          'É necessário ter 18 anos ou mais para realizar um pedido.',
+        );
+      }
+
+      // Validação de cidade para DELIVERY
+      if (
+        dto.metodoEntrega === MetodoEntrega.DELIVERY &&
+        dto.enderecoCidade?.toLowerCase().trim() !== 'uberaba'
+      ) {
+        throw new BadRequestException(
+          'Só realizamos entregas em Uberaba - MG.',
+        );
+      }
+
       if (!activeCart) {
         activeCart = manager.create(Encomendas, {
           clienteId: userId ?? undefined,
@@ -238,7 +291,7 @@ export class CartService {
         );
       }
 
-      finalCart.dataAgendada = this.toIsoDate(dto.dataAgendada) as string;
+      finalCart.dataAgendada = dataAgendadaIso as string;
       finalCart.horaAgendada = dto.horaAgendada;
       finalCart.metodoEntrega = dto.metodoEntrega;
       finalCart.metodoPagamento = dto.metodoPagamento;
@@ -271,10 +324,7 @@ export class CartService {
         finalCart.carrinhos = carrinhosSelecionados;
       }
 
-      activeCart = await manager.save(finalCart);
-
-      const savedCart = activeCart;
-
+      // Validação de quantidade total de picolés
       const itemsMap = new Map<number, number>();
       dto.items.forEach((item) => {
         if (item.quantity > 0) {
@@ -283,6 +333,54 @@ export class CartService {
         }
       });
 
+      const totalPicoles = Array.from(itemsMap.values()).reduce(
+        (sum, qty) => sum + qty,
+        0,
+      );
+      if (totalPicoles < 80) {
+        throw new BadRequestException(
+          'Pedido mínimo de 80 picolés por encomenda.',
+        );
+      }
+      if (totalPicoles > 2000) {
+        throw new BadRequestException(
+          'Pedido máximo de 2.000 picolés por encomenda.',
+        );
+      }
+
+      // Validação de capacidade dos carrinhos selecionados
+      if (finalCart.carrinhos && finalCart.carrinhos.length > 0) {
+        const capacidadeTotal = finalCart.carrinhos.reduce(
+          (soma, c) => soma + (c.capacidade || 0),
+          0,
+        );
+        if (totalPicoles > capacidadeTotal) {
+          throw new BadRequestException(
+            `Capacidade insuficiente: os carrinhos selecionados comportam ${capacidadeTotal} picolés, mas o pedido tem ${totalPicoles}. Selecione mais carrinhos.`,
+          );
+        }
+      }
+
+      // Re-verificação de disponibilidade de carrinhos
+      const availabilityResult = await this.checkAvailability(
+        dto.dataAgendada + 'T' + (dto.horaAgendada || '00:00'),
+      );
+      if (dto.cartIds && dto.cartIds.length > 0) {
+        const availableIds = availabilityResult.details.map((c) => c.id);
+        const conflictingCart = dto.cartIds.find(
+          (id) => !availableIds.includes(id),
+        );
+        if (conflictingCart !== undefined) {
+          throw new BadRequestException(
+            `O carrinho ${conflictingCart} não está disponível para o horário selecionado (conflito de 12h).`,
+          );
+        }
+      }
+
+      activeCart = await manager.save(finalCart);
+
+      const savedCart = activeCart;
+
       const itensParaSalvar: EncomendaItens[] = [];
       let somaProdutos = 0;
 
@@ -290,7 +388,10 @@ export class CartService {
         const produto = await manager.findOne(Product, {
           where: { id: productId },
         });
-        const preco = produto ? Number(produto.preco_unitario) : 0;
+        if (!produto) {
+          throw new BadRequestException(`Produto ID ${productId} não encontrado.`);
+        }
+        const preco = Number(produto.preco_unitario);
 
         const novoItem = manager.create(EncomendaItens, {
           encomenda: { id: savedCart.id },

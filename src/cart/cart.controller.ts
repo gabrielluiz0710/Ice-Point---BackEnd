@@ -12,6 +12,7 @@ import {
 import { CartService } from './cart.service';
 import { CartTransferDto } from './dto/cart-transfer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CheckoutDto } from './dto/checkout.dto';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -56,12 +57,13 @@ export class CartController {
     return await this.cartService.checkAvailability(dateString);
   }
 
+  // valida o token quando presente (usuario logado),
+  // mas permite guest checkout quando não há token
+  @UseGuards(OptionalJwtAuthGuard)
   @Post('checkout')
-  async finalizeOrder(@Body() checkoutDto: CheckoutDto) {
-    return await this.cartService.finalizeOrder(
-      checkoutDto.userId,
-      checkoutDto,
-    );
+  async finalizeOrder(@Request() req, @Body() checkoutDto: CheckoutDto) {
+    const userId: string | null = req.user?.userId ?? null;
+    return await this.cartService.finalizeOrder(userId, checkoutDto);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -75,3 +77,4 @@ export class CartController {
     return await this.cartService.createOrderByAdmin(createDto, adminId);
   }
 }
+

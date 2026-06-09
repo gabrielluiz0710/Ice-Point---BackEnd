@@ -1,4 +1,4 @@
-import { IsOptional, IsDateString } from 'class-validator';
+import { IsOptional, IsDateString, IsIn } from 'class-validator';
 
 export class GetDashboardDto {
   @IsOptional()
@@ -9,5 +9,7 @@ export class GetDashboardDto {
   @IsDateString()
   endDate?: string;
 
+  @IsOptional()
+  @IsIn(['revenue', 'quantity'])
   sortBy?: 'revenue' | 'quantity';
 }

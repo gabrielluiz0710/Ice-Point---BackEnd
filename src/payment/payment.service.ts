@@ -1,12 +1,23 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Encomendas } from '../encomendas/encomendas.entity';
 
 @Injectable()
 export class PaymentService {
   private client: MercadoPagoConfig;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @InjectRepository(Encomendas)
+    private readonly encomendaRepository: Repository<Encomendas>,
+  ) {
     const accessToken =
       this.configService.get<string>('MERCADO_PAGO_ACCESS_TOKEN') ?? '';
 
@@ -21,32 +32,63 @@ export class PaymentService {
         this.configService.get<string>('FRONTEND_URL') ??
         'https://www.icepoint.com.br';
 
+      // Busca o pedido e os preços DIRETAMENTE do banco
+      const orderId = orderData.orderId;
+      if (!orderId) {
+        throw new NotFoundException('orderId é obrigatório.');
+      }
+
+      const order = await this.encomendaRepository.findOne({
+        where: { id: orderId },
+        relations: ['itens', 'itens.produto'],
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Pedido ${orderId} não encontrado.`);
+      }
+
       const preference = new Preference(this.client);
 
-      const items = orderData.items.map((item) => ({
-        id: item.color,
-        title: `Carrinho de Picolé - ${item.color}`,
-        quantity: Number(item.quantity),
-        unit_price: Number(item.unitPrice || 0),
+      // Usa os preços congelados no momento do checkout
+      const items = order.itens.map((item) => ({
+        id: String(item.produto?.id ?? item.id),
+        title: item.produto?.nome ?? 'Produto Ice Point',
+        quantity: Number(item.quantidade),
+        unit_price: Number(item.precoUnitarioCongelado),
       }));
 
-      if (orderData.deliveryFee > 0) {
+      // Taxa de entrega do banco
+      const deliveryFee = Number(order.taxaEntrega ?? 0);
+      if (deliveryFee > 0) {
         items.push({
           id: 'delivery',
           title: 'Taxa de Entrega',
           quantity: 1,
-          unit_price: Number(orderData.deliveryFee),
+          unit_price: deliveryFee,
+        });
+      }
+
+      // Desconto registrado no banco
+      if (order.valorDesconto && Number(order.valorDesconto) > 0) {
+        items.push({
+          id: 'desconto',
+          title: 'Desconto aplicado',
+          quantity: 1,
+          unit_price: -Number(order.valorDesconto),
         });
       }
 
       const body = {
         items: items,
         payer: {
-          email: orderData.buyer.email,
-          name: orderData.buyer.fullName,
+          email: orderData.buyer?.email ?? order.emailCliente,
+          name: orderData.buyer?.fullName ?? order.nomeCliente,
           identification: {
             type: 'CPF',
-            number: orderData.buyer.cpf.replace(/\D/g, ''),
+            number: (orderData.buyer?.cpf ?? order.cpfCliente ?? '').replace(
+              /\D/g,
+              '',
+            ),
           },
         },
         back_urls: {
@@ -59,7 +101,7 @@ export class PaymentService {
           excluded_payment_types: [{ id: 'ticket' }],
           installments: 1,
         },
-        external_reference: orderData.orderId,
+        external_reference: String(orderId),
         statement_descriptor: 'ICE POINT',
       };
 
@@ -70,8 +112,10 @@ export class PaymentService {
         id: result.id,
       };
     } catch (error) {
+      if (error instanceof NotFoundException) throw error;
       console.error('Erro ao criar preferência MP:', error);
       throw new InternalServerErrorException('Erro ao processar pagamento');
     }
   }
 }
+
