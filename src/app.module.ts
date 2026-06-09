@@ -2,21 +2,22 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { SupabaseModule } from './supabase/supabase.module';
-import { AuthModule } from './auth/auth.module'; 
-import { UsersModule } from './users/users.module'; 
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 import { ProductsModule } from './products/products.module';
-import { CartModule } from './cart/cart.module'; 
+import { CartModule } from './cart/cart.module';
 import { EnderecosModule } from './enderecos/enderecos.module';
 import { GoogleReviewsModule } from './google-reviews/google-reviews.module';
 import { PaymentModule } from './payment/payment.module';
 import { EncomendasModule } from './encomendas/encomendas.module';
 import { ShippingModule } from './shipping/shipping.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    
+
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
@@ -27,22 +28,22 @@ import { DashboardModule } from './dashboard/dashboard.module';
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_DATABASE'),
         autoLoadEntities: true,
-        synchronize: false, 
+        synchronize: false,
 
         ssl: false,
 
         extra: {
-          max: 20, 
-          connectionTimeoutMillis: 40000, 
-          idleTimeoutMillis: 30000, 
-          keepAlive: true, 
+          max: 20,
+          connectionTimeoutMillis: 40000,
+          idleTimeoutMillis: 30000,
+          keepAlive: true,
         },
       }),
       inject: [ConfigService],
     }),
-    SupabaseModule, 
-    AuthModule, 
-    UsersModule, 
+    SupabaseModule,
+    AuthModule,
+    UsersModule,
     CartModule,
     EnderecosModule,
     ProductsModule,
@@ -50,7 +51,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     PaymentModule,
     EncomendasModule,
     ShippingModule,
-    DashboardModule
+    DashboardModule,
+    WhatsappModule,
   ],
   controllers: [],
   providers: [],

@@ -68,7 +68,7 @@ export class EncomendasService {
         status: order.status,
         dataCriacao: order.dataSolicitacao,
         dataAgendada: order.dataAgendada,
-        total: order.valorTotal, 
+        total: order.valorTotal,
       };
 
       if (statusFinalizados.includes(order.status)) {
@@ -122,22 +122,22 @@ export class EncomendasService {
 
     let cadastradoPor: any = null;
     if (order.cadastradoPorId) {
-       const adminUser = await this.usuarioRepository.findOne({
-           where: { id: order.cadastradoPorId },
-           select: ['nome', 'email', 'tipo']
-       });
-       if (adminUser) {
-           cadastradoPor = {
-               nome: adminUser.nome,
-               email: adminUser.email,
-               tipo: adminUser.tipo
-           };
-       }
+      const adminUser = await this.usuarioRepository.findOne({
+        where: { id: order.cadastradoPorId },
+        select: ['nome', 'email', 'tipo'],
+      });
+      if (adminUser) {
+        cadastradoPor = {
+          nome: adminUser.nome,
+          email: adminUser.email,
+          tipo: adminUser.tipo,
+        };
+      }
     }
 
     return {
-        ...order,
-        cadastradoPor
+      ...order,
+      cadastradoPor,
     };
   }
 
@@ -156,21 +156,29 @@ export class EncomendasService {
     }
 
     const isOwnerById = order.clienteId === userId;
-    const isOwnerByEmail = order.emailCliente?.toLowerCase() === usuario.email.toLowerCase();
-    const canManage = usuario.tipo === 'ADMIN' || usuario.tipo === 'FUNCIONARIO';
+    const isOwnerByEmail =
+      order.emailCliente?.toLowerCase() === usuario.email.toLowerCase();
+    const canManage =
+      usuario.tipo === 'ADMIN' || usuario.tipo === 'FUNCIONARIO';
 
     if (!isOwnerById && !isOwnerByEmail && !canManage) {
-      throw new ForbiddenException('Você não tem permissão para cancelar este pedido.');
+      throw new ForbiddenException(
+        'Você não tem permissão para cancelar este pedido.',
+      );
     }
 
     if (order.status === EncomendaStatus.CANCELADO) {
-        throw new BadRequestException('Este pedido já está cancelado.');
+      throw new BadRequestException('Este pedido já está cancelado.');
     }
     if (order.status === EncomendaStatus.ENTREGUE) {
-        throw new BadRequestException('Não é possível cancelar um pedido já entregue.');
+      throw new BadRequestException(
+        'Não é possível cancelar um pedido já entregue.',
+      );
     }
     if (order.status === EncomendaStatus.CONCLUIDO) {
-        throw new BadRequestException('Não é possível cancelar um pedido já concluído.');
+      throw new BadRequestException(
+        'Não é possível cancelar um pedido já concluído.',
+      );
     }
 
     order.status = EncomendaStatus.CANCELADO;
@@ -199,9 +207,9 @@ export class EncomendasService {
 
   async findActiveOrdersByWeek(startDateStr: string) {
     const startDate = new Date(startDateStr);
-    
+
     if (isNaN(startDate.getTime())) {
-       throw new BadRequestException('Data inicial inválida.');
+      throw new BadRequestException('Data inicial inválida.');
     }
 
     const endDate = new Date(startDate);
@@ -213,7 +221,7 @@ export class EncomendasService {
     const statusFinalizados = [
       EncomendaStatus.CONCLUIDO,
       EncomendaStatus.CANCELADO,
-      EncomendaStatus.PENDENTE 
+      EncomendaStatus.PENDENTE,
     ];
 
     const encomendas = await this.encomendaRepository.find({
@@ -231,19 +239,25 @@ export class EncomendasService {
     return {
       periodo: {
         inicio: startIso,
-        fim: endIso
+        fim: endIso,
       },
       total: encomendas.length,
-      data: encomendas
+      data: encomendas,
     };
   }
 
-  async updateStatus(orderId: number, userId: string, updateDto: UpdateEncomendaStatusDto) {
-    const usuario = await this.usuarioRepository.findOne({ where: { id: userId } });
+  async updateStatus(
+    orderId: number,
+    userId: string,
+    updateDto: UpdateEncomendaStatusDto,
+  ) {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: userId },
+    });
     if (!usuario) throw new NotFoundException('Usuário inválido.');
 
     if (usuario.tipo !== 'ADMIN' && usuario.tipo !== 'FUNCIONARIO') {
-        throw new ForbiddenException('Permissão negada.');
+      throw new ForbiddenException('Permissão negada.');
     }
 
     const order = await this.encomendaRepository.findOne({
@@ -259,7 +273,7 @@ export class EncomendasService {
     const newStatus = updateDto.status;
 
     if (oldStatus === newStatus) {
-        return order;
+      return order;
     }
 
     order.status = newStatus;
@@ -273,7 +287,12 @@ export class EncomendasService {
       });
       const adminEmails = admins.map((u) => u.email).filter((e) => !!e);
 
-      this.mailService.sendStatusUpdateEmails(savedOrder, oldStatus, newStatus, adminEmails);
+      this.mailService.sendStatusUpdateEmails(
+        savedOrder,
+        oldStatus,
+        newStatus,
+        adminEmails,
+      );
     } catch (error) {
       console.error('Erro ao enviar notificação de status:', error);
     }
@@ -281,15 +300,23 @@ export class EncomendasService {
     return savedOrder;
   }
 
-  async updatePaymentStatus(orderId: number, userId: string, updateDto: UpdatePagamentoStatusDto) {
-    const usuario = await this.usuarioRepository.findOne({ where: { id: userId } });
+  async updatePaymentStatus(
+    orderId: number,
+    userId: string,
+    updateDto: UpdatePagamentoStatusDto,
+  ) {
+    const usuario = await this.usuarioRepository.findOne({
+      where: { id: userId },
+    });
     if (!usuario) throw new NotFoundException('Usuário inválido.');
 
     if (usuario.tipo !== 'ADMIN' && usuario.tipo !== 'FUNCIONARIO') {
-        throw new ForbiddenException('Permissão negada.');
+      throw new ForbiddenException('Permissão negada.');
     }
 
-    const order = await this.encomendaRepository.findOne({ where: { id: orderId } });
+    const order = await this.encomendaRepository.findOne({
+      where: { id: orderId },
+    });
 
     if (!order) {
       throw new NotFoundException('Pedido não encontrado.');
@@ -297,9 +324,12 @@ export class EncomendasService {
 
     order.statusPagamento = updateDto.status;
     if (updateDto.status === 'PAGO') {
-        if (order.status === EncomendaStatus.PENDENTE || order.status === EncomendaStatus.AGUARDANDO_PAGAMENTO) {
-            order.status = EncomendaStatus.CONFIRMADO;
-        }
+      if (
+        order.status === EncomendaStatus.PENDENTE ||
+        order.status === EncomendaStatus.AGUARDANDO_PAGAMENTO
+      ) {
+        order.status = EncomendaStatus.CONFIRMADO;
+      }
     }
 
     return await this.encomendaRepository.save(order);

@@ -22,7 +22,7 @@ export class CreateProductDto {
   preco_unitario: number;
 
   @IsOptional()
-  disponivel: any; 
+  disponivel: any;
 
   @IsOptional()
   ingredientes: string;
@@ -31,7 +31,7 @@ export class CreateProductDto {
   alergicos: string;
 
   @IsOptional()
-  informacaoNutricional: string; 
+  informacaoNutricional: string;
 
   @IsOptional()
   imagensParaRemover?: string;

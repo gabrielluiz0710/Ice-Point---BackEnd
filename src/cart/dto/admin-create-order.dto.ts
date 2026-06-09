@@ -1,6 +1,19 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsArray, ValidateNested, IsNumber, Min } from 'class-validator';
+import {
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsArray,
+  ValidateNested,
+  IsNumber,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { MetodoEntrega, MetodoPagamento } from '../../encomendas/encomenda.enums';
+import {
+  MetodoEntrega,
+  MetodoPagamento,
+} from '../../encomendas/encomenda.enums';
 
 class OrderItemDto {
   @IsNumber()
@@ -14,7 +27,9 @@ class OrderItemDto {
 
 export class AdminCreateOrderDto {
   @IsEmail()
-  @IsNotEmpty({ message: 'O email do cliente é obrigatório para identificação.' })
+  @IsNotEmpty({
+    message: 'O email do cliente é obrigatório para identificação.',
+  })
   email: string;
 
   @IsString()

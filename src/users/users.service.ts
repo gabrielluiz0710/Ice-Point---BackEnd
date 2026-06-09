@@ -3,14 +3,14 @@ import {
   NotFoundException,
   BadRequestException,
   Inject,
-  InternalServerErrorException
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, ILike } from 'typeorm';
 import { Usuarios, UserProfile } from './usuarios.entity';
 import { Enderecos } from '../enderecos/enderecos.entity';
 import { SupabaseClient } from '@supabase/supabase-js';
-import * as sharp from 'sharp'; 
+import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -25,7 +25,7 @@ export class UsersService {
   ) {}
 
   async findProfileByUserId(userId: string): Promise<Usuarios> {
-    let profile = await this.userRepository.findOne({
+    const profile = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['enderecos'],
       order: {
@@ -40,8 +40,9 @@ export class UsersService {
 
     if (!profile.avatar_url) {
       try {
-        const { data: authUser, error } = await this.supabaseAdmin.auth.admin.getUserById(userId);
-        
+        const { data: authUser, error } =
+          await this.supabaseAdmin.auth.admin.getUserById(userId);
+
         if (!error && authUser && authUser.user) {
           const metadata = authUser.user.user_metadata;
           const externalPhoto = metadata?.avatar_url || metadata?.picture;
@@ -49,7 +50,9 @@ export class UsersService {
           if (externalPhoto) {
             profile.avatar_url = externalPhoto;
             await this.userRepository.save(profile);
-            console.log(`[UsersService] Avatar sincronizado de fonte externa para o user ${userId}`);
+            console.log(
+              `[UsersService] Avatar sincronizado de fonte externa para o user ${userId}`,
+            );
           }
         }
       } catch (syncError) {
@@ -109,19 +112,23 @@ export class UsersService {
 
     if (!newUserId) {
       if (!this.supabaseAdmin) {
-        throw new BadRequestException('Configuração de Admin do Supabase ausente.');
+        throw new BadRequestException(
+          'Configuração de Admin do Supabase ausente.',
+        );
       }
 
       const redirectLink = `${originUrl}/atualizar-senha`;
 
       const { data: authData, error: authError } =
         await this.supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
-          redirectTo: redirectLink
+          redirectTo: redirectLink,
         });
 
       if (authError) {
-        console.error('Erro Supabase Invite:', authError); 
-        throw new BadRequestException('Erro ao criar usuário no Auth: ' + authError.message);
+        console.error('Erro Supabase Invite:', authError);
+        throw new BadRequestException(
+          'Erro ao criar usuário no Auth: ' + authError.message,
+        );
       }
 
       newUserId = authData.user.id;
@@ -135,7 +142,7 @@ export class UsersService {
       telefone: data.telefone,
       cpf: data.cpf,
       data_nascimento: data.data_nascimento || null,
-      data_admissao: data.data_admissao || null,     
+      data_admissao: data.data_admissao || null,
     });
 
     return this.userRepository.save(newUser);
@@ -218,13 +225,16 @@ export class UsersService {
     return this.findProfileByUserId(userId);
   }
 
-  async uploadAvatar(userId: string, file: Express.Multer.File): Promise<{ avatarUrl: string }> {
+  async uploadAvatar(
+    userId: string,
+    file: Express.Multer.File,
+  ): Promise<{ avatarUrl: string }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('Usuário não encontrado');
 
     try {
       const webpBuffer = await sharp(file.buffer)
-        .resize({ width: 400, height: 400, fit: 'cover' }) 
+        .resize({ width: 400, height: 400, fit: 'cover' })
         .webp({ quality: 80 })
         .toBuffer();
 
@@ -232,25 +242,26 @@ export class UsersService {
 
       const { error } = await this.supabaseAdmin.storage
         .from('images')
-        .upload(fileName, webpBuffer, { 
-          contentType: 'image/webp', 
-          upsert: true 
+        .upload(fileName, webpBuffer, {
+          contentType: 'image/webp',
+          upsert: true,
         });
 
       if (error) {
         console.error('Supabase Storage Error:', error);
-        throw new InternalServerErrorException('Erro ao fazer upload da imagem.');
+        throw new InternalServerErrorException(
+          'Erro ao fazer upload da imagem.',
+        );
       }
 
-      const { data: { publicUrl } } = this.supabaseAdmin.storage
-        .from('images')
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = this.supabaseAdmin.storage.from('images').getPublicUrl(fileName);
 
       user.avatar_url = publicUrl;
       await this.userRepository.save(user);
 
       return { avatarUrl: publicUrl };
-
     } catch (err) {
       console.error('Erro no processamento do avatar:', err);
       throw new InternalServerErrorException('Falha ao processar avatar.');

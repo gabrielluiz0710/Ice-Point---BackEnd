@@ -13,7 +13,7 @@ export interface JwtPayload {
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
-    private usersService: UsersService
+    private usersService: UsersService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -26,13 +26,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.usersService.findProfileByUserId(payload.sub);
 
     if (!user) {
-        throw new UnauthorizedException('Usuário não encontrado.');
+      throw new UnauthorizedException('Usuário não encontrado.');
     }
 
     return {
       userId: user.id,
       email: user.email,
-      role: user.tipo
+      role: user.tipo,
     };
   }
 }

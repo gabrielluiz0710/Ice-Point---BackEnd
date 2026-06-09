@@ -12,33 +12,36 @@ export class CalendarService {
   constructor() {
     let privateKey: string;
 
-    if (process.env.GOOGLE_PRIVATE_KEY_BASE64){
-      try{
-        privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_BASE64, 'base64').toString('utf-8');
-      } catch (e){
-        this.logger.error('Falha ao decodificar GOOGLE_PRIVATE_KEY_BASE64')
+    if (process.env.GOOGLE_PRIVATE_KEY_BASE64) {
+      try {
+        privateKey = Buffer.from(
+          process.env.GOOGLE_PRIVATE_KEY_BASE64,
+          'base64',
+        ).toString('utf-8');
+      } catch (e) {
+        this.logger.error('Falha ao decodificar GOOGLE_PRIVATE_KEY_BASE64');
         throw e;
       }
-    }
-    else if (process.env.GOOGLE_PRIVATE_KEY) {
+    } else if (process.env.GOOGLE_PRIVATE_KEY) {
       privateKey = process.env.GOOGLE_PRIVATE_KEY;
-      
-      if (privateKey.startsWith('"') && privateKey.endsWith('"')){
+
+      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
         privateKey = privateKey.slice(1, -1);
       }
       privateKey = privateKey.replace(/\\n/g, '\n');
-    } 
-    else {
-      this.logger.error('Nenhuma chave privada do Google encontrada (GOOGLE_PRIVATE_KEY_BASE64 ou GOOGLE_PRIVATE_KEY)');
+    } else {
+      this.logger.error(
+        'Nenhuma chave privada do Google encontrada (GOOGLE_PRIVATE_KEY_BASE64 ou GOOGLE_PRIVATE_KEY)',
+      );
       throw new Error('Google Private Key missing');
     }
     if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
       privateKey = privateKey.slice(1, -1);
     }
     privateKey = privateKey.replace(/\\n/g, '\n');
-    if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')){
+    if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
       this.logger.error('Formato de chave inválido.');
-      throw new Error ('Invalid Key Format')
+      throw new Error('Invalid Key Format');
     }
 
     const auth = new google.auth.JWT({
@@ -62,16 +65,22 @@ export class CalendarService {
 
       const productsByCategory: Record<string, string[]> = {};
 
-      const fmt = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val));
+      const fmt = (val) =>
+        new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(Number(val));
 
       order.itens.forEach((item) => {
         const catName = item.produto.categoria?.nome || 'Outros';
-        
+
         if (!productsByCategory[catName]) {
           productsByCategory[catName] = [];
         }
 
-        productsByCategory[catName].push(`${item.produto.nome} - ${item.quantidade}x`);
+        productsByCategory[catName].push(
+          `${item.produto.nome} - ${item.quantidade}x`,
+        );
       });
 
       let productsHtml = '';
@@ -79,7 +88,12 @@ export class CalendarService {
         productsHtml += `\n<b>${category}:</b>\n${products.join('\n')}\n`;
       }
 
-      const payIcon = order.metodoPagamento === 'PIX' ? '💠' : order.metodoPagamento === 'CASH' ? '💵' : '💳';
+      const payIcon =
+        order.metodoPagamento === 'PIX'
+          ? '💠'
+          : order.metodoPagamento === 'CASH'
+            ? '💵'
+            : '💳';
       let description = `
         <b>DADOS DO CLIENTE</b>
         👤 <b>Nome:</b> ${order.nomeCliente}
@@ -91,9 +105,16 @@ export class CalendarService {
         
         🛒 <b>CARRINHOS SELECIONADOS</b>
         <ul>
-          ${order.carrinhos?.length 
-            ? order.carrinhos.map((c) => `<li>Carrinho <b>${c.cor}</b> (${c.identificacao})</li>`).join('') 
-            : '<li>Nenhum carrinho específico</li>'}
+          ${
+            order.carrinhos?.length
+              ? order.carrinhos
+                  .map(
+                    (c) =>
+                      `<li>Carrinho <b>${c.cor}</b> (${c.identificacao})</li>`,
+                  )
+                  .join('')
+              : '<li>Nenhum carrinho específico</li>'
+          }
         </ul>
         
         ──────────────────────────
@@ -152,13 +173,14 @@ export class CalendarService {
         requestBody: event,
       });
 
-      this.logger.log(`Evento criado na agenda da loja! Link: ${response.data.htmlLink}`);
+      this.logger.log(
+        `Evento criado na agenda da loja! Link: ${response.data.htmlLink}`,
+      );
       return response.data.id;
-
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
-        'Erro ao criar evento no Google Calendar', 
-        error?.response?.data || error.message || error
+        'Erro ao criar evento no Google Calendar',
+        error?.response?.data || error.message || error,
       );
     }
   }
@@ -172,8 +194,10 @@ export class CalendarService {
         eventId: googleEventId,
       });
       this.logger.log(`Evento ${googleEventId} removido do Google Calendar.`);
-    } catch (error) {
-      this.logger.warn(`Falha ao remover evento do calendário: ${error.message}`);
+    } catch (error: any) {
+      this.logger.warn(
+        `Falha ao remover evento do calendário: ${error.message}`,
+      );
     }
   }
 }

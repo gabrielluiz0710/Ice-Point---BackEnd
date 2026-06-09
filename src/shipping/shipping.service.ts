@@ -2,21 +2,27 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { ConfigService } from '@nestjs/config';
+import { CalculateShippingDto } from './dto/calculate-shipping.dto';
 
 @Injectable()
 export class ShippingService {
   private readonly logger = new Logger(ShippingService.name);
-  
-  private readonly STORE_ORIGIN = 'Av. Padre Eddie Bernardes da Silva, 965, Lourdes, Uberaba - MG, 38035-230';
+
+  private readonly STORE_ORIGIN =
+    'Av. Padre Eddie Bernardes da Silva, 965, Lourdes, Uberaba - MG, 38035-230';
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {}
 
-  async calculateShippingFee(addressData: { street: string; number: string; city: string; state: string; cep: string; neighborhood?: string }) {
-    const apiKey = this.configService.get<string>('GOOGLE_MAPS_SHIPPING_API_KEY');
-    
+  async calculateShippingFee(
+    addressData: CalculateShippingDto,
+  ): Promise<{ distance: string; fee: number; debug_address: string }> {
+    const apiKey = this.configService.get<string>(
+      'GOOGLE_MAPS_SHIPPING_API_KEY',
+    );
+
     if (!apiKey) {
       this.logger.error('GOOGLE_MAPS_SHIPPING_API_KEY não configurada');
       throw new BadRequestException('Erro de configuração no servidor.');
@@ -27,15 +33,25 @@ export class ShippingService {
       addressData.neighborhood ? addressData.neighborhood : '',
       `${addressData.city} - ${addressData.state}`,
       `CEP ${addressData.cep}`,
-      'Brasil'
-    ].filter(Boolean).join(', ');
+      'Brasil',
+    ]
+      .filter(Boolean)
+      .join(', ');
 
-    this.logger.log(`Calculando frete de: [${this.STORE_ORIGIN}] para [${destinationString}]`);
+    this.logger.log(
+      `Calculando frete de: [${this.STORE_ORIGIN}] para [${destinationString}]`,
+    );
 
-    const distanceInMeters = await this.getDistanceMatrix(this.STORE_ORIGIN, destinationString, apiKey);
+    const distanceInMeters = await this.getDistanceMatrix(
+      this.STORE_ORIGIN,
+      destinationString,
+      apiKey,
+    );
 
     if (distanceInMeters === null) {
-        throw new BadRequestException('Endereço não localizado com precisão. Verifique o número e o CEP.');
+      throw new BadRequestException(
+        'Endereço não localizado com precisão. Verifique o número e o CEP.',
+      );
     }
 
     const distanceInKm = distanceInMeters / 1000;
@@ -45,7 +61,7 @@ export class ShippingService {
     return {
       distance: distanceInKm.toFixed(2) + ' km',
       fee: price,
-      debug_address: destinationString 
+      debug_address: destinationString,
     };
   }
 
@@ -60,7 +76,11 @@ export class ShippingService {
     */
   }
 
-  private async getDistanceMatrix(origin: string, destination: string, apiKey: string): Promise<number | null> {
+  private async getDistanceMatrix(
+    origin: string,
+    destination: string,
+    apiKey: string,
+  ): Promise<number | null> {
     const encodedOrigin = encodeURIComponent(origin);
     const encodedDestination = encodeURIComponent(destination);
 
@@ -70,7 +90,9 @@ export class ShippingService {
       const { data } = await firstValueFrom(this.httpService.get(url));
 
       if (data.status !== 'OK') {
-        this.logger.error(`Google API Error: ${data.status} - ${data.error_message}`);
+        this.logger.error(
+          `Google API Error: ${data.status} - ${data.error_message}`,
+        );
         return null;
       }
 
@@ -78,12 +100,13 @@ export class ShippingService {
       const element = row.elements[0];
 
       if (element.status !== 'OK') {
-        this.logger.warn(`Element status error: ${element.status} (Provavelmente endereço não encontrado)`);
+        this.logger.warn(
+          `Element status error: ${element.status} (Provavelmente endereço não encontrado)`,
+        );
         return null;
       }
 
       return element.distance.value;
-
     } catch (error) {
       this.logger.error('Falha na requisição ao Google Maps', error);
       return null;

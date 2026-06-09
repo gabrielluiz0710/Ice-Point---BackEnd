@@ -18,9 +18,13 @@ import { EncomendaItens } from '../encomendas/encomenda-itens.entity';
 import { Product } from '../products/entities/product.entity';
 import { Carrinho } from '../carrinhos/carrinho.entity';
 import { Usuarios } from '../users/usuarios.entity';
-import { EncomendaStatus, MetodoEntrega, MetodoPagamento } from '../encomendas/encomenda.enums'; 
+import {
+  EncomendaStatus,
+  MetodoEntrega,
+  MetodoPagamento,
+} from '../encomendas/encomenda.enums';
 import { CheckoutDto } from './dto/checkout.dto';
-import { EncomendasCarrinhos } from '../encomendas/encomendas-carrinhos.entity'; 
+import { EncomendasCarrinhos } from '../encomendas/encomendas-carrinhos.entity';
 import { MailService } from '../mail/mail.service';
 import { CalendarService } from '../calendar/calendar.service';
 import { AdminCreateOrderDto } from './dto/admin-create-order.dto';
@@ -86,7 +90,14 @@ export class CartService {
         const produto = await manager.findOne(Product, {
           where: { id: itemDto.productId },
         });
-        const preco = produto ? Number(produto.preco_unitario) : 0;
+
+        if (!produto) {
+          throw new BadRequestException(
+            `Produto com ID ${itemDto.productId} não encontrado.`,
+          );
+        }
+
+        const preco = Number(produto.preco_unitario);
 
         const novoItem = manager.create(EncomendaItens, {
           encomenda: { id: activeCart.id },
@@ -117,29 +128,37 @@ export class CartService {
     if (isNaN(requestDate.getTime())) {
       throw new BadRequestException('Data inválida fornecida.');
     }
-    
-    const conflictStart = new Date(requestDate.getTime() - 12 * 60 * 60 * 1000); 
-    const conflictEnd = new Date(requestDate.getTime() + 12 * 60 * 60 * 1000);  
+
+    const conflictStart = new Date(requestDate.getTime() - 12 * 60 * 60 * 1000);
+    const conflictEnd = new Date(requestDate.getTime() + 12 * 60 * 60 * 1000);
 
     const busyCarts = await this.encomendasCarrinhosRepository
       .createQueryBuilder('ec')
       .innerJoin('ec.encomenda', 'e')
       .select('ec.carrinhoId')
-      .where('e.status NOT IN (:...freeStatuses)', { 
-          freeStatuses: [EncomendaStatus.CANCELADO, EncomendaStatus.ENTREGUE] 
+      .where('e.status NOT IN (:...freeStatuses)', {
+        freeStatuses: [EncomendaStatus.CANCELADO, EncomendaStatus.ENTREGUE],
       })
-      .andWhere("(e.data_agendada + e.hora_agendada) > :start", { start: conflictStart })
-      .andWhere("(e.data_agendada + e.hora_agendada) < :end", { end: conflictEnd })
+      .andWhere('(e.data_agendada + e.hora_agendada) > :start', {
+        start: conflictStart,
+      })
+      .andWhere('(e.data_agendada + e.hora_agendada) < :end', {
+        end: conflictEnd,
+      })
       .getMany();
 
     const busyCartIds = busyCarts.map((bc) => bc.carrinhoId);
 
     const queryBuilder = this.carrinhoRepository.createQueryBuilder('c');
-    
-    queryBuilder.where('c.status = :statusCarrinho', { statusCarrinho: 'DISPONIVEL' });
+
+    queryBuilder.where('c.status = :statusCarrinho', {
+      statusCarrinho: 'DISPONIVEL',
+    });
 
     if (busyCartIds.length > 0) {
-      queryBuilder.andWhere('c.id NOT IN (:...busyIds)', { busyIds: busyCartIds });
+      queryBuilder.andWhere('c.id NOT IN (:...busyIds)', {
+        busyIds: busyCartIds,
+      });
     }
 
     const availableCarts = await queryBuilder.getMany();
@@ -194,15 +213,61 @@ export class CartService {
         });
       }
 
+      // D+1: data agendada deve ser no mínimo o dia seguinte (UTC)
+      const dataAgendadaIso = this.toIsoDate(dto.dataAgendada);
+      if (!dataAgendadaIso) {
+        throw new BadRequestException('Data agendada inválida.');
+      }
+      const hoje = new Date();
+      hoje.setUTCHours(0, 0, 0, 0);
+      const amanha = new Date(hoje);
+      amanha.setUTCDate(hoje.getUTCDate() + 1);
+      const dataAgendadaDate = new Date(dataAgendadaIso + 'T00:00:00Z');
+      if (dataAgendadaDate < amanha) {
+        throw new BadRequestException(
+          'O agendamento deve ser para no mínimo o dia seguinte (D+1).',
+        );
+      }
+
+      // Validação de maioridade (18 anos)
+      const birthDateRaw =
+        dto.personalData?.birthDate || usuario?.data_nascimento;
+
+      if (!birthDateRaw) {
+        throw new BadRequestException(
+          'Data de nascimento é obrigatória para realizar um pedido.',
+        );
+      }
+
+      const isoBirthDate = this.toIsoDate(birthDateRaw);
+      const nascimento = new Date(isoBirthDate + 'T00:00:00Z');
+      const idadeAnos =
+        (Date.now() - nascimento.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+      if (idadeAnos < 18) {
+        throw new BadRequestException(
+          'É necessário ter 18 anos ou mais para realizar um pedido.',
+        );
+      }
+
+      // Validação de cidade para DELIVERY
+      if (
+        dto.metodoEntrega === MetodoEntrega.DELIVERY &&
+        dto.enderecoCidade?.toLowerCase().trim() !== 'uberaba'
+      ) {
+        throw new BadRequestException(
+          'Só realizamos entregas em Uberaba - MG.',
+        );
+      }
+
       if (!activeCart) {
         activeCart = manager.create(Encomendas, {
-          clienteId: userId ?? undefined, 
+          clienteId: userId ?? undefined,
           status: EncomendaStatus.PENDENTE,
           itens: [],
         });
       }
 
-      const finalCart = activeCart!;
+      const finalCart = activeCart;
 
       if (finalCart.id) {
         await manager.delete(EncomendaItens, { encomendaId: finalCart.id });
@@ -210,26 +275,33 @@ export class CartService {
 
       const personalData = dto.personalData || {};
 
-      finalCart.nomeCliente = personalData.fullName || usuario?.nome || 'Cliente Convidado';
+      finalCart.nomeCliente =
+        personalData.fullName || usuario?.nome || 'Cliente Convidado';
       finalCart.emailCliente = personalData.email || usuario?.email || '';
       finalCart.telefoneCliente = personalData.phone || usuario?.telefone || '';
       finalCart.cpfCliente = personalData.cpf || usuario?.cpf || '';
 
       if (personalData.birthDate) {
-        finalCart.dataNascimentoCliente = this.toIsoDate(personalData.birthDate);
+        finalCart.dataNascimentoCliente = this.toIsoDate(
+          personalData.birthDate,
+        );
       } else if (usuario?.data_nascimento) {
-        finalCart.dataNascimentoCliente = this.toIsoDate(usuario.data_nascimento);
+        finalCart.dataNascimentoCliente = this.toIsoDate(
+          usuario.data_nascimento,
+        );
       }
 
-      finalCart.dataAgendada = this.toIsoDate(dto.dataAgendada) as string;
+      finalCart.dataAgendada = dataAgendadaIso as string;
       finalCart.horaAgendada = dto.horaAgendada;
       finalCart.metodoEntrega = dto.metodoEntrega;
       finalCart.metodoPagamento = dto.metodoPagamento;
 
       if (dto.enderecoCep) finalCart.enderecoCep = dto.enderecoCep;
-      if (dto.enderecoLogradouro) finalCart.enderecoLogradouro = dto.enderecoLogradouro;
+      if (dto.enderecoLogradouro)
+        finalCart.enderecoLogradouro = dto.enderecoLogradouro;
       if (dto.enderecoNumero) finalCart.enderecoNumero = dto.enderecoNumero;
-      if (dto.enderecoComplemento) finalCart.enderecoComplemento = dto.enderecoComplemento;
+      if (dto.enderecoComplemento)
+        finalCart.enderecoComplemento = dto.enderecoComplemento;
       if (dto.enderecoBairro) finalCart.enderecoBairro = dto.enderecoBairro;
       if (dto.enderecoCidade) finalCart.enderecoCidade = dto.enderecoCidade;
       if (dto.enderecoEstado) finalCart.enderecoEstado = dto.enderecoEstado;
@@ -245,15 +317,14 @@ export class CartService {
           id: In(dto.cartIds),
         });
         if (carrinhosSelecionados.length !== dto.cartIds.length) {
-          throw new BadRequestException('Um ou mais carrinhos selecionados são inválidos.');
+          throw new BadRequestException(
+            'Um ou mais carrinhos selecionados são inválidos.',
+          );
         }
         finalCart.carrinhos = carrinhosSelecionados;
       }
 
-      activeCart = await manager.save(finalCart);
-      
-      const savedCart = activeCart;
-
+      // Validação de quantidade total de picolés
       const itemsMap = new Map<number, number>();
       dto.items.forEach((item) => {
         if (item.quantity > 0) {
@@ -262,12 +333,65 @@ export class CartService {
         }
       });
 
+      const totalPicoles = Array.from(itemsMap.values()).reduce(
+        (sum, qty) => sum + qty,
+        0,
+      );
+      if (totalPicoles < 80) {
+        throw new BadRequestException(
+          'Pedido mínimo de 80 picolés por encomenda.',
+        );
+      }
+      if (totalPicoles > 2000) {
+        throw new BadRequestException(
+          'Pedido máximo de 2.000 picolés por encomenda.',
+        );
+      }
+
+      // Validação de capacidade dos carrinhos selecionados
+      if (finalCart.carrinhos && finalCart.carrinhos.length > 0) {
+        const capacidadeTotal = finalCart.carrinhos.reduce(
+          (soma, c) => soma + (c.capacidade || 0),
+          0,
+        );
+        if (totalPicoles > capacidadeTotal) {
+          throw new BadRequestException(
+            `Capacidade insuficiente: os carrinhos selecionados comportam ${capacidadeTotal} picolés, mas o pedido tem ${totalPicoles}. Selecione mais carrinhos.`,
+          );
+        }
+      }
+
+      // Re-verificação de disponibilidade de carrinhos
+      const availabilityResult = await this.checkAvailability(
+        dto.dataAgendada + 'T' + (dto.horaAgendada || '00:00'),
+      );
+      if (dto.cartIds && dto.cartIds.length > 0) {
+        const availableIds = availabilityResult.details.map((c) => c.id);
+        const conflictingCart = dto.cartIds.find(
+          (id) => !availableIds.includes(id),
+        );
+        if (conflictingCart !== undefined) {
+          throw new BadRequestException(
+            `O carrinho ${conflictingCart} não está disponível para o horário selecionado (conflito de 12h).`,
+          );
+        }
+      }
+
+      activeCart = await manager.save(finalCart);
+
+      const savedCart = activeCart;
+
       const itensParaSalvar: EncomendaItens[] = [];
       let somaProdutos = 0;
 
       for (const [productId, quantity] of itemsMap.entries()) {
-        const produto = await manager.findOne(Product, { where: { id: productId } });
-        const preco = produto ? Number(produto.preco_unitario) : 0;
+        const produto = await manager.findOne(Product, {
+          where: { id: productId },
+        });
+        if (!produto) {
+          throw new BadRequestException(`Produto ID ${productId} não encontrado.`);
+        }
+        const preco = Number(produto.preco_unitario);
 
         const novoItem = manager.create(EncomendaItens, {
           encomenda: { id: savedCart.id },
@@ -286,7 +410,7 @@ export class CartService {
 
       let taxaEntrega = 0;
       if (savedCart.metodoEntrega === MetodoEntrega.DELIVERY) {
-        taxaEntrega = 20.00;
+        taxaEntrega = 20.0;
       }
 
       let valorDesconto = 0;
@@ -294,7 +418,7 @@ export class CartService {
         savedCart.metodoPagamento === MetodoPagamento.PIX ||
         savedCart.metodoPagamento === MetodoPagamento.CASH
       ) {
-        valorDesconto = somaProdutos * 0.10;
+        valorDesconto = somaProdutos * 0.1;
       }
 
       const valorTotalFinal = somaProdutos + taxaEntrega - valorDesconto;
@@ -304,26 +428,36 @@ export class CartService {
         taxaEntrega: taxaEntrega,
         valorDesconto: valorDesconto,
         valorTotal: valorTotalFinal,
-        status: savedCart.status
+        status: savedCart.status,
       });
 
       const fullOrder = await manager.findOne(Encomendas, {
         where: { id: savedCart.id },
-        relations: ['itens', 'itens.produto', 'itens.produto.categoria', 'carrinhos'],
+        relations: [
+          'itens',
+          'itens.produto',
+          'itens.produto.categoria',
+          'carrinhos',
+        ],
       });
 
       const admins = await manager.find(Usuarios, {
         where: { tipo: 'ADMIN' },
         select: ['email'],
       });
-      const adminEmails = admins.map(u => u.email).filter(email => !!email);
+      const adminEmails = admins.map((u) => u.email).filter((email) => !!email);
 
       if (fullOrder) {
-        this.mailService.sendNewOrderEmails(fullOrder, adminEmails); 
-        const eventId = await this.calendarService.createOrderEvent(fullOrder, adminEmails);
-  
+        this.mailService.sendNewOrderEmails(fullOrder, adminEmails);
+        const eventId = await this.calendarService.createOrderEvent(
+          fullOrder,
+          adminEmails,
+        );
+
         if (eventId) {
-          await manager.update(Encomendas, fullOrder.id, { googleEventId: eventId });
+          await manager.update(Encomendas, fullOrder.id, {
+            googleEventId: eventId,
+          });
         }
       }
 
@@ -335,7 +469,7 @@ export class CartService {
           produtos: somaProdutos,
           entrega: taxaEntrega,
           desconto: valorDesconto,
-          total: valorTotalFinal
+          total: valorTotalFinal,
         },
         message: 'Pedido realizado com sucesso!',
       };
@@ -344,8 +478,8 @@ export class CartService {
 
   async createOrderByAdmin(dto: AdminCreateOrderDto, adminId: string) {
     return await this.dataSource.transaction(async (manager) => {
-      const usuario = await manager.findOne(Usuarios, { 
-        where: { email: dto.email } 
+      const usuario = await manager.findOne(Usuarios, {
+        where: { email: dto.email },
       });
 
       const newOrder = manager.create(Encomendas, {
@@ -354,15 +488,19 @@ export class CartService {
         emailCliente: dto.email,
         telefoneCliente: dto.phone || usuario?.telefone || '',
         cpfCliente: dto.cpf || usuario?.cpf || '',
-        dataNascimentoCliente: dto.birthDate ? this.toIsoDate(dto.birthDate) : (usuario?.data_nascimento ? this.toIsoDate(usuario.data_nascimento) : null),
-        
+        dataNascimentoCliente: dto.birthDate
+          ? this.toIsoDate(dto.birthDate)
+          : usuario?.data_nascimento
+            ? this.toIsoDate(usuario.data_nascimento)
+            : null,
+
         dataSolicitacao: new Date(),
         dataAgendada: this.toIsoDate(dto.dataAgendada) as string,
         horaAgendada: dto.horaAgendada,
-        
+
         metodoEntrega: dto.metodoEntrega,
         metodoPagamento: dto.metodoPagamento,
-        
+
         enderecoCep: dto.enderecoCep,
         enderecoLogradouro: dto.enderecoLogradouro,
         enderecoNumero: dto.enderecoNumero,
@@ -370,15 +508,19 @@ export class CartService {
         enderecoCidade: dto.enderecoCidade,
         enderecoEstado: dto.enderecoEstado,
 
-        status: EncomendaStatus.CONFIRMADO, 
+        status: EncomendaStatus.CONFIRMADO,
         itens: [],
-        cadastradoPorId: adminId
+        cadastradoPorId: adminId,
       });
 
       if (dto.cartIds && dto.cartIds.length > 0) {
-        const carrinhos = await manager.findBy(Carrinho, { id: In(dto.cartIds) });
+        const carrinhos = await manager.findBy(Carrinho, {
+          id: In(dto.cartIds),
+        });
         if (carrinhos.length !== dto.cartIds.length) {
-           throw new BadRequestException('Alguns carrinhos selecionados não foram encontrados.');
+          throw new BadRequestException(
+            'Alguns carrinhos selecionados não foram encontrados.',
+          );
         }
         newOrder.carrinhos = carrinhos;
       }
@@ -397,9 +539,14 @@ export class CartService {
       });
 
       for (const [productId, quantity] of itemsMap.entries()) {
-        const produto = await manager.findOne(Product, { where: { id: productId } });
-        if (!produto) throw new NotFoundException(`Produto ID ${productId} não encontrado.`);
-        
+        const produto = await manager.findOne(Product, {
+          where: { id: productId },
+        });
+        if (!produto)
+          throw new NotFoundException(
+            `Produto ID ${productId} não encontrado.`,
+          );
+
         const preco = Number(produto.preco_unitario);
 
         const novoItem = manager.create(EncomendaItens, {
@@ -431,34 +578,49 @@ export class CartService {
 
       const fullOrder = await manager.findOne(Encomendas, {
         where: { id: savedOrder.id },
-        relations: ['itens', 'itens.produto', 'itens.produto.categoria', 'carrinhos'],
+        relations: [
+          'itens',
+          'itens.produto',
+          'itens.produto.categoria',
+          'carrinhos',
+        ],
       });
 
-      if (!fullOrder) throw new Error('Erro crítico ao recuperar pedido criado.');
+      if (!fullOrder)
+        throw new Error('Erro crítico ao recuperar pedido criado.');
 
       try {
         const admins = await manager.find(Usuarios, {
-            where: { tipo: 'ADMIN' },
-            select: ['email'],
+          where: { tipo: 'ADMIN' },
+          select: ['email'],
         });
-        const adminEmails = admins.map(u => u.email).filter(email => !!email);
-        
+        const adminEmails = admins
+          .map((u) => u.email)
+          .filter((email) => !!email);
+
         this.mailService.sendNewOrderEmails(fullOrder, adminEmails);
 
-        const eventId = await this.calendarService.createOrderEvent(fullOrder, adminEmails);
+        const eventId = await this.calendarService.createOrderEvent(
+          fullOrder,
+          adminEmails,
+        );
         if (eventId) {
-            await manager.update(Encomendas, fullOrder.id, { googleEventId: eventId });
+          await manager.update(Encomendas, fullOrder.id, {
+            googleEventId: eventId,
+          });
         }
-
       } catch (error) {
-          console.error("Erro nos serviços de terceiro (Email/Calendar) para pedido Admin:", error);
+        console.error(
+          'Erro nos serviços de terceiro (Email/Calendar) para pedido Admin:',
+          error,
+        );
       }
 
       return {
         success: true,
         orderId: fullOrder.id,
         message: 'Encomenda lançada com sucesso pelo Admin!',
-        total: valorTotalFinal
+        total: valorTotalFinal,
       };
     });
   }

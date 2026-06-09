@@ -23,10 +23,6 @@ class PersonalDataDto {
 }
 
 export class CheckoutDto {
-  @IsString()
-  @IsOptional()
-  userId: string;
-
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CartItemDto)

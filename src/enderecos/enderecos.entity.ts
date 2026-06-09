@@ -1,39 +1,45 @@
-import { Entity, Column, ManyToOne, JoinColumn, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
 import { Usuarios } from '../users/usuarios.entity';
 
 @Entity('enderecos')
 export class Enderecos {
-    @PrimaryGeneratedColumn('increment')
-    id: number;
+  @PrimaryGeneratedColumn('increment')
+  id: number;
 
-    @Column()
-    logradouro: string;
+  @Column()
+  logradouro: string;
 
-    @Column()
-    numero: string;
+  @Column()
+  numero: string;
 
-    @Column({ nullable: true })
-    complemento: string;
+  @Column({ nullable: true })
+  complemento: string;
 
-    @Column()
-    bairro: string;
+  @Column()
+  bairro: string;
 
-    @Column()
-    cidade: string;
-    
-    @Column()
-    estado: string;
+  @Column()
+  cidade: string;
 
-    @Column()
-    cep: string;
+  @Column()
+  estado: string;
 
-    @Column({ default: false })
-    principal: boolean;
+  @Column()
+  cep: string;
 
-    @Column({ name: 'usuario_id', type: 'uuid' })
-    usuarioId: string;
+  @Column({ default: false })
+  principal: boolean;
 
-    @ManyToOne(() => Usuarios, (usuario) => usuario.enderecos)
-    @JoinColumn({ name: 'usuario_id' })
-    usuario: Usuarios;
+  @Column({ name: 'usuario_id', type: 'uuid' })
+  usuarioId: string;
+
+  @ManyToOne(() => Usuarios, (usuario) => usuario.enderecos)
+  @JoinColumn({ name: 'usuario_id' })
+  usuario: Usuarios;
 }

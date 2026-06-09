@@ -36,7 +36,9 @@ export class DashboardService {
       });
     }
     if (filters.endDate) {
-      qb.andWhere(`${dateField}::date <= :endDate`, { endDate: filters.endDate });
+      qb.andWhere(`${dateField}::date <= :endDate`, {
+        endDate: filters.endDate,
+      });
     }
   }
 
@@ -209,11 +211,11 @@ export class DashboardService {
       .andWhere('encomenda.status IN (:...statuses)', {
         statuses: this.validStatuses,
       })
-      .andWhere("encomenda.metodoEntrega = :deliveryMethod", { 
-         deliveryMethod: MetodoEntrega.DELIVERY 
+      .andWhere('encomenda.metodoEntrega = :deliveryMethod', {
+        deliveryMethod: MetodoEntrega.DELIVERY,
       })
       .andWhere('encomenda.enderecoBairro IS NOT NULL')
-      .andWhere("encomenda.enderecoBairro != ''") 
+      .andWhere("encomenda.enderecoBairro != ''")
       .groupBy('encomenda.enderecoBairro')
       .orderBy('count', 'DESC')
       .limit(8)

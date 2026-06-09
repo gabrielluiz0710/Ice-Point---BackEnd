@@ -5,13 +5,9 @@ import { EnderecosController } from './enderecos.controller';
 import { Enderecos } from '../enderecos/enderecos.entity';
 
 @Module({
-    imports: [
-        TypeOrmModule.forFeature([
-            Enderecos
-        ]), 
-    ],
-    controllers: [EnderecosController],
-    providers: [EnderecosService],
-    exports: [EnderecosService],
+  imports: [TypeOrmModule.forFeature([Enderecos])],
+  controllers: [EnderecosController],
+  providers: [EnderecosService],
+  exports: [EnderecosService],
 })
 export class EnderecosModule {}
