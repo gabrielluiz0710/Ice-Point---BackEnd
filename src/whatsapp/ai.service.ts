@@ -221,7 +221,7 @@ Se não conseguir interpretar o endereço, responda:
   ): Promise<string | null> {
     try {
       const url = `https://viacep.com.br/ws/${encodeURIComponent(estado)}/${encodeURIComponent(cidade)}/${encodeURIComponent(logradouro)}/json/`;
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
       const data = (await response.json()) as any[];
 
       if (Array.isArray(data) && data.length > 0) {
@@ -238,7 +238,7 @@ Se não conseguir interpretar o endereço, responda:
     try {
       const cepLimpo = cep.replace(/\D/g, '');
       const url = `https://viacep.com.br/ws/${cepLimpo}/json/`;
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
       const data = (await response.json()) as Record<string, any>;
 
       if (data.erro) return null;

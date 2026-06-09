@@ -7,6 +7,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
@@ -15,6 +16,7 @@ export class AuthController {
     private readonly supabaseAdmin: SupabaseClient,
   ) {}
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('check-email')
   async checkUserStatus(@Body() body: { email: string }) {
     const { email } = body;

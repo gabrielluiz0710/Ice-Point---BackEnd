@@ -6,6 +6,7 @@ import {
   Logger,
   Request,
   UnauthorizedException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { GetDashboardDto } from './dto/dashboard.dto';
@@ -51,7 +52,7 @@ export class DashboardController {
         `Erro ao buscar dados do dashboard: ${error.message}`,
         error.stack,
       );
-      throw error;
+      throw new InternalServerErrorException('Erro ao processar dados do dashboard.');
     }
   }
 
