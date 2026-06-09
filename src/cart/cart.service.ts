@@ -28,6 +28,7 @@ import { EncomendasCarrinhos } from '../encomendas/encomendas-carrinhos.entity';
 import { MailService } from '../mail/mail.service';
 import { CalendarService } from '../calendar/calendar.service';
 import { AdminCreateOrderDto } from './dto/admin-create-order.dto';
+import { ShippingService } from '../shipping/shipping.service';
 
 @Injectable()
 export class CartService {
@@ -46,6 +47,7 @@ export class CartService {
     private readonly encomendasCarrinhosRepository: Repository<EncomendasCarrinhos>,
     private readonly mailService: MailService,
     private readonly calendarService: CalendarService,
+    private readonly shippingService: ShippingService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -123,7 +125,10 @@ export class CartService {
   }
 
   async checkAvailability(dateString: string) {
-    const requestDate = new Date(dateString);
+    const brtDateString = dateString.includes('-03:00') || dateString.endsWith('Z') 
+      ? dateString 
+      : `${dateString}-03:00`;
+    const requestDate = new Date(brtDateString);
 
     if (isNaN(requestDate.getTime())) {
       throw new BadRequestException('Data inválida fornecida.');
@@ -213,17 +218,17 @@ export class CartService {
         });
       }
 
-      // D+1: data agendada deve ser no mínimo o dia seguinte (UTC)
+      // D+1: data agendada deve ser no mínimo o dia seguinte (BRT)
       const dataAgendadaIso = this.toIsoDate(dto.dataAgendada);
       if (!dataAgendadaIso) {
         throw new BadRequestException('Data agendada inválida.');
       }
-      const hoje = new Date();
-      hoje.setUTCHours(0, 0, 0, 0);
-      const amanha = new Date(hoje);
-      amanha.setUTCDate(hoje.getUTCDate() + 1);
-      const dataAgendadaDate = new Date(dataAgendadaIso + 'T00:00:00Z');
-      if (dataAgendadaDate < amanha) {
+      
+      const now = new Date();
+      const brtTime = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+      const brtDateString = brtTime.toISOString().split('T')[0];
+
+      if (dataAgendadaIso <= brtDateString) {
         throw new BadRequestException(
           'O agendamento deve ser para no mínimo o dia seguinte (D+1).',
         );
@@ -240,7 +245,7 @@ export class CartService {
       }
 
       const isoBirthDate = this.toIsoDate(birthDateRaw);
-      const nascimento = new Date(isoBirthDate + 'T00:00:00Z');
+      const nascimento = new Date(isoBirthDate + 'T00:00:00-03:00');
       const idadeAnos =
         (Date.now() - nascimento.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
       if (idadeAnos < 18) {
@@ -250,13 +255,41 @@ export class CartService {
       }
 
       // Validação de cidade para DELIVERY
-      if (
-        dto.metodoEntrega === MetodoEntrega.DELIVERY &&
-        dto.enderecoCidade?.toLowerCase().trim() !== 'uberaba'
-      ) {
-        throw new BadRequestException(
-          'Só realizamos entregas em Uberaba - MG.',
-        );
+      if (dto.metodoEntrega === MetodoEntrega.DELIVERY) {
+        if (dto.enderecoCidade?.toLowerCase().trim() !== 'uberaba') {
+          throw new BadRequestException('Só realizamos entregas em Uberaba - MG.');
+        }
+
+        if (!dto.enderecoCep) {
+          throw new BadRequestException('CEP é obrigatório para entrega.');
+        }
+
+        const cepOnlyDigits = dto.enderecoCep.replace(/\D/g, '');
+        if (cepOnlyDigits.length !== 8) {
+          throw new BadRequestException('CEP inválido.');
+        }
+
+        try {
+          const viaCepRes = await fetch(`https://viacep.com.br/ws/${cepOnlyDigits}/json/`, {
+            signal: AbortSignal.timeout(5000), // Timeout de 5 segundos
+          });
+          if (!viaCepRes.ok) throw new Error('ViaCEP error');
+          
+          const viaCepData = await viaCepRes.json();
+          if (viaCepData.erro || viaCepData.localidade?.toLowerCase() !== 'uberaba') {
+            throw new BadRequestException('O CEP informado não pertence a Uberaba - MG.');
+          }
+        } catch (error) {
+          if (error instanceof BadRequestException) {
+            throw error;
+          }
+          // Fallback: ignora falha de rede do ViaCEP e confia na validação de prefixo
+          console.warn(`ViaCEP indisponível para validação do CEP ${cepOnlyDigits}. Usando validação de prefixo como fallback.`);
+          
+          if (!cepOnlyDigits.startsWith('380') && !cepOnlyDigits.startsWith('381')) {
+            throw new BadRequestException('ViaCEP offline: O CEP informado não parece pertencer a Uberaba - MG (Fora do intervalo 380xx-381xx).');
+          }
+        }
       }
 
       if (!activeCart) {
@@ -384,10 +417,13 @@ export class CartService {
       const itensParaSalvar: EncomendaItens[] = [];
       let somaProdutos = 0;
 
+      const productIdsToFetch = Array.from(itemsMap.keys());
+      const products = await manager.find(Product, {
+        where: { id: In(productIdsToFetch) },
+      });
+
       for (const [productId, quantity] of itemsMap.entries()) {
-        const produto = await manager.findOne(Product, {
-          where: { id: productId },
-        });
+        const produto = products.find((p) => p.id === productId);
         if (!produto) {
           throw new BadRequestException(`Produto ID ${productId} não encontrado.`);
         }
@@ -410,7 +446,18 @@ export class CartService {
 
       let taxaEntrega = 0;
       if (savedCart.metodoEntrega === MetodoEntrega.DELIVERY) {
-        taxaEntrega = 20.0;
+        if (!dto.enderecoCep || !dto.enderecoLogradouro || !dto.enderecoNumero || !dto.enderecoCidade || !dto.enderecoEstado) {
+          throw new BadRequestException('Endereço incompleto para cálculo de frete.');
+        }
+        const shippingResult = await this.shippingService.calculateShippingFee({
+          cep: dto.enderecoCep,
+          street: dto.enderecoLogradouro,
+          number: dto.enderecoNumero,
+          neighborhood: dto.enderecoBairro || '',
+          city: dto.enderecoCidade,
+          state: dto.enderecoEstado,
+        });
+        taxaEntrega = shippingResult.fee;
       }
 
       let valorDesconto = 0;
@@ -538,10 +585,13 @@ export class CartService {
         }
       });
 
+      const productIdsToFetchAdmin = Array.from(itemsMap.keys());
+      const productsAdmin = await manager.find(Product, {
+        where: { id: In(productIdsToFetchAdmin) },
+      });
+
       for (const [productId, quantity] of itemsMap.entries()) {
-        const produto = await manager.findOne(Product, {
-          where: { id: productId },
-        });
+        const produto = productsAdmin.find((p) => p.id === productId);
         if (!produto)
           throw new NotFoundException(
             `Produto ID ${productId} não encontrado.`,

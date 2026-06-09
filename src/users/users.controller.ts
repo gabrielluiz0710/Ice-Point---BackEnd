@@ -130,8 +130,5 @@ export class UsersController {
     return this.usersService.uploadAvatar(req.user.userId, file);
   }
 
-  @Get()
-  getPublicData() {
-    return { message: 'Dados públicos acessíveis a todos.' };
-  }
+
 }

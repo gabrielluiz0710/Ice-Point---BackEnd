@@ -10,6 +10,7 @@ import { Carrinho } from '../carrinhos/carrinho.entity';
 import { Usuarios } from '../users/usuarios.entity';
 import { MailService } from '../mail/mail.service';
 import { CalendarService } from '../calendar/calendar.service';
+import { ShippingModule } from '../shipping/shipping.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { CalendarService } from '../calendar/calendar.service';
       Usuarios,
       EncomendasCarrinhos,
     ]),
+    ShippingModule,
   ],
   controllers: [CartController],
   providers: [CartService, MailService, CalendarService],

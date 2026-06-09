@@ -12,6 +12,7 @@ import { Enderecos } from '../enderecos/enderecos.entity';
 import { SupabaseClient } from '@supabase/supabase-js';
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
+import { Encomendas } from '../encomendas/encomendas.entity';
 
 @Injectable()
 export class UsersService {
@@ -163,6 +164,20 @@ export class UsersService {
   }
 
   async deleteUser(id: string): Promise<void> {
+    // Anonimização LGPD: remover dados sensíveis das encomendas
+    await this.userRepository.manager.update(
+      Encomendas,
+      { clienteId: id },
+      {
+        nomeCliente: 'Usuário Removido',
+        emailCliente: 'anonimo@removido.com',
+        telefoneCliente: '',
+        cpfCliente: '000.000.000-00',
+        dataNascimentoCliente: null,
+        clienteId: null,
+      },
+    );
+
     const result = await this.userRepository.delete(id);
     if (result.affected === 0) {
       throw new NotFoundException('Usuário não encontrado');

@@ -181,6 +181,14 @@ export class EncomendasService {
       );
     }
 
+    if (!canManage && order.dataAgendada && order.horaAgendada) {
+      const dataHoraAgendamento = new Date(`${order.dataAgendada}T${order.horaAgendada}:00-03:00`);
+      const diferencaHoras = (dataHoraAgendamento.getTime() - Date.now()) / (1000 * 60 * 60);
+      if (diferencaHoras < 2) {
+        throw new BadRequestException('Não é possível cancelar com menos de 2h de antecedência.');
+      }
+    }
+
     order.status = EncomendaStatus.CANCELADO;
     order.motivoCancelamento = motivo;
 
