@@ -71,10 +71,11 @@ describe('EncomendasService — cancelOrder', () => {
   it('deve permitir cancelamento se antecedência for maior que 2 horas', async () => {
     const usuario = makeUsuario('CLIENTE');
 
-    // Agendamento daqui a 3 horas
-    const tresHorasAFrente = new Date(Date.now() + 3 * 60 * 60 * 1000);
-    const dataStr = tresHorasAFrente.toISOString().split('T')[0]; // "YYYY-MM-DD"
-    const horaStr = tresHorasAFrente.toTimeString().slice(0, 5);   // "HH:MM"
+    // Agendamento daqui a 3 horas (calculado precisamente para o fuso -03:00 do backend)
+    const targetTime = new Date(Date.now() + 3 * 60 * 60 * 1000);
+    const localBrasiliaTime = new Date(targetTime.getTime() - 3 * 60 * 60 * 1000);
+    const dataStr = localBrasiliaTime.toISOString().split('T')[0]; // "YYYY-MM-DD"
+    const horaStr = localBrasiliaTime.toISOString().split('T')[1].slice(0, 5);   // "HH:MM"
 
     const encomenda = makeEncomenda({ dataAgendada: dataStr, horaAgendada: horaStr });
     const encomendaSalva = { ...encomenda, status: EncomendaStatus.CANCELADO };
@@ -96,10 +97,11 @@ describe('EncomendasService — cancelOrder', () => {
   it('deve lançar BadRequestException se antecedência for menor que 2 horas', async () => {
     const usuario = makeUsuario('CLIENTE');
 
-    // Agendamento daqui a 30 minutos
-    const trintaMinAFrente = new Date(Date.now() + 30 * 60 * 1000);
-    const dataStr = trintaMinAFrente.toISOString().split('T')[0];
-    const horaStr = trintaMinAFrente.toTimeString().slice(0, 5);
+    // Agendamento daqui a 30 minutos (calculado precisamente para o fuso -03:00)
+    const targetTime = new Date(Date.now() + 30 * 60 * 1000);
+    const localBrasiliaTime = new Date(targetTime.getTime() - 3 * 60 * 60 * 1000);
+    const dataStr = localBrasiliaTime.toISOString().split('T')[0];
+    const horaStr = localBrasiliaTime.toISOString().split('T')[1].slice(0, 5);
 
     const encomenda = makeEncomenda({ dataAgendada: dataStr, horaAgendada: horaStr });
 
@@ -120,10 +122,11 @@ describe('EncomendasService — cancelOrder', () => {
   it('deve permitir cancelamento com menos de 2 horas se o usuário for ADMIN', async () => {
     const admin = makeUsuario('ADMIN');
 
-    // Agendamento daqui a 30 minutos
-    const trintaMinAFrente = new Date(Date.now() + 30 * 60 * 1000);
-    const dataStr = trintaMinAFrente.toISOString().split('T')[0];
-    const horaStr = trintaMinAFrente.toTimeString().slice(0, 5);
+    // Agendamento daqui a 30 minutos (calculado precisamente para o fuso -03:00)
+    const targetTime = new Date(Date.now() + 30 * 60 * 1000);
+    const localBrasiliaTime = new Date(targetTime.getTime() - 3 * 60 * 60 * 1000);
+    const dataStr = localBrasiliaTime.toISOString().split('T')[0];
+    const horaStr = localBrasiliaTime.toISOString().split('T')[1].slice(0, 5);
 
     const encomenda = makeEncomenda({
       dataAgendada: dataStr,
