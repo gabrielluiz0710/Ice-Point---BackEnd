@@ -4,6 +4,7 @@ import {
   ManyToOne,
   JoinColumn,
   PrimaryGeneratedColumn,
+  Relation,
 } from 'typeorm';
 import { Usuarios } from '../users/usuarios.entity';
 
@@ -41,5 +42,5 @@ export class Enderecos {
 
   @ManyToOne(() => Usuarios, (usuario) => usuario.enderecos)
   @JoinColumn({ name: 'usuario_id' })
-  usuario: Usuarios;
+  usuario: Relation<Usuarios>;
 }

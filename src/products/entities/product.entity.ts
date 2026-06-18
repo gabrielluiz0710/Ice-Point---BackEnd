@@ -6,6 +6,7 @@ import {
   OneToMany,
   JoinColumn,
   CreateDateColumn,
+  Relation,
 } from 'typeorm';
 import { Category } from './category.entity';
 import { ProductImage } from './product-image.entity';
@@ -55,5 +56,5 @@ export class Product {
   categoria: Category;
 
   @OneToMany(() => ProductImage, (image) => image.produto, { cascade: true })
-  imagens: ProductImage[];
+  imagens: Relation<ProductImage[]>;
 }

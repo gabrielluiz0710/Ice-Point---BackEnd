@@ -1,0 +1,40 @@
+name: CI/CD Pipeline — Ice Point Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-test-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Baixa o código do repositório
+      - name: Checkout do Código
+        uses: actions/checkout@v4
+
+      # 2. Prepara o ambiente Node.js com cache automático de dependências
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. Instala as dependências de forma limpa e exata
+      - name: Instalar Dependências
+        run: npm ci
+
+      # 4. Compila o projeto (barreira de sintaxe e erros TypeScript)
+      - name: Build do Projeto (NestJS)
+        run: npm run build
+
+      # 5. Roda os testes unitários (barreira das regras de negócio)
+      - name: Rodar Testes (Jest)
+        run: npm run test
+
+      # 6. Deploy — só dispara se build e testes passarem
+      - name: Disparar Deploy no Coolify
+        run: |
+          curl --request GET "${{ secrets.COOLIFY_WEBHOOK_URL }}" \
+          --header "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}"

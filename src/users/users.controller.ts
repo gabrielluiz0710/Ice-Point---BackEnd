@@ -20,6 +20,9 @@ import { UsersService } from './users.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { CreateUserAdminDto } from './dto/create-user-admin.dto';
+import { UpdateUserAdminDto } from './dto/update-user-admin.dto';
 
 @Controller('users')
 export class UsersController {
@@ -63,7 +66,7 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Put('profile')
-  async updateProfile(@Request() req, @Body() body: any) {
+  async updateProfile(@Request() req, @Body() body: UpdateProfileDto) {
     return this.usersService.updateProfile(req.user.userId, body);
   }
 
@@ -84,7 +87,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Post()
-  async createUser(@Request() req, @Body() body: any) {
+  async createUser(@Request() req, @Body() body: CreateUserAdminDto) {
     let origin =
       req.headers.origin ||
       req.headers.referer ||
@@ -101,7 +104,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Put(':id')
-  async editUser(@Param('id') id: string, @Body() body: any) {
+  async editUser(@Param('id') id: string, @Body() body: UpdateUserAdminDto) {
     return this.usersService.adminUpdateUser(id, body);
   }
 

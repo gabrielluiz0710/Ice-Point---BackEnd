@@ -6,6 +6,7 @@ import {
   ManyToMany,
   JoinTable,
   CreateDateColumn,
+  Relation,
 } from 'typeorm';
 import { EncomendaItens } from './encomenda-itens.entity';
 import { Carrinho } from '../carrinhos/carrinho.entity';
@@ -150,7 +151,7 @@ export class Encomendas {
   cadastradoPorId: string | null;
 
   @OneToMany(() => EncomendaItens, (item) => item.encomenda, { cascade: true })
-  itens: EncomendaItens[];
+  itens: Relation<EncomendaItens[]>;
 
   @ManyToMany(() => Carrinho)
   @JoinTable({
@@ -158,5 +159,5 @@ export class Encomendas {
     joinColumn: { name: 'encomenda_id', referencedColumnName: 'id' },
     inverseJoinColumn: { name: 'carrinho_id', referencedColumnName: 'id' },
   })
-  carrinhos: Carrinho[];
+  carrinhos: Relation<Carrinho[]>;
 }

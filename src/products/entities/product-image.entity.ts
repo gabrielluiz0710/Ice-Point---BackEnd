@@ -4,6 +4,7 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
+  Relation,
 } from 'typeorm';
 import { Product } from './product.entity';
 
@@ -28,5 +29,5 @@ export class ProductImage {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'produto_id' })
-  produto: Product;
+  produto: Relation<Product>;
 }

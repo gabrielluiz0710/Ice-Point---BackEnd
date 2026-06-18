@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryColumn, ManyToOne, JoinColumn, Relation } from 'typeorm';
 import { Encomendas } from './encomendas.entity';
 import { Carrinho } from '../carrinhos/carrinho.entity';
 
@@ -14,9 +14,9 @@ export class EncomendasCarrinhos {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'encomenda_id' })
-  encomenda: Encomendas;
+  encomenda: Relation<Encomendas>;
 
   @ManyToOne(() => Carrinho, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'carrinho_id' })
-  carrinho: Carrinho;
+  carrinho: Relation<Carrinho>;
 }

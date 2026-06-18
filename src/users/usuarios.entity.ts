@@ -6,6 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
   PrimaryGeneratedColumn,
+  Relation,
 } from 'typeorm';
 import { Enderecos } from '../enderecos/enderecos.entity';
 
@@ -53,5 +54,5 @@ export class Usuarios implements UserProfile {
   }
 
   @OneToMany(() => Enderecos, (endereco) => endereco.usuario, { cascade: true })
-  enderecos: Enderecos[];
+  enderecos: Relation<Enderecos[]>;
 }

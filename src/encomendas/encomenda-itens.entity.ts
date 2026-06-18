@@ -4,6 +4,7 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
+  Relation,
 } from 'typeorm';
 import { Encomendas } from './encomendas.entity';
 import { Product } from '../products/entities/product.entity';
@@ -34,9 +35,9 @@ export class EncomendaItens {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'encomenda_id' })
-  encomenda: Encomendas;
+  encomenda: Relation<Encomendas>;
 
   @ManyToOne(() => Product)
   @JoinColumn({ name: 'produto_id' })
-  produto: Product;
+  produto: Relation<Product>;
 }
