@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 import { Encomendas } from '../encomendas/encomendas.entity';
 import { MetodoEntrega } from '../encomendas/encomenda.enums';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import sharp from 'sharp';
+import * as sharp from 'sharp';
 
 const CART_IMAGES: Record<string, string> = {
   azul: 'https://db.icepoint.com.br/storage/v1/object/public/images/carrinhos/azul.webp',

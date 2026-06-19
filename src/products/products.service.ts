@@ -11,7 +11,7 @@ import { Category } from './entities/category.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { createClient } from '@supabase/supabase-js';
-import sharp from 'sharp';
+import * as sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()

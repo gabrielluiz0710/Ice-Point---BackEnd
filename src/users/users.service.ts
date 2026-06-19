@@ -10,7 +10,7 @@ import { Repository, In, ILike } from 'typeorm';
 import { Usuarios, UserProfile } from './usuarios.entity';
 import { Enderecos } from '../enderecos/enderecos.entity';
 import { SupabaseClient } from '@supabase/supabase-js';
-import sharp from 'sharp';
+import * as sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 import { Encomendas } from '../encomendas/encomendas.entity';
 
