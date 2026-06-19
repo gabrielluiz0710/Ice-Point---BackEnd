@@ -204,9 +204,9 @@ describe('CartService — finalizeOrder', () => {
   // 5. TESTE DA BARREIRA TEMPORAL - agendamento D+1 (data no passado)
   // ================================================================
   it('deve bloquear pedido se a data de agendamento for hoje ou no passado (regra D+1)', async () => {
-    // Hoje: não pode agendar
-    const hoje = new Date().toISOString().split('T')[0];
-    const dto = makeCheckoutDto({ dataAgendada: hoje });
+    // Usa uma data no passado para garantir que caia na regra de bloqueio independentemente de fuso horário
+    const passado = '2000-01-01';
+    const dto = makeCheckoutDto({ dataAgendada: passado });
 
     await expect(service.finalizeOrder(null, dto)).rejects.toThrow(
       new BadRequestException('O agendamento deve ser para no mínimo o dia seguinte (D+1).'),
